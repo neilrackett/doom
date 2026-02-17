@@ -9,5 +9,8 @@
 Debug/
 Release/
 Build/
-doomgeneric
 doomgeneric.map
+.DS_Store
+/build
+/obj
+/tmp
