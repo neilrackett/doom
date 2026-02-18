@@ -58,6 +58,12 @@
 #include "dstrings.h"
 #include "sounds.h"
 
+#ifdef __EMSCRIPTEN__
+void DG_HudOverlayClear(void);
+int DG_HudOverlayBeginCapture(void);
+void DG_HudOverlayEndCapture(void);
+#endif
+
 //
 // STATUS BAR DATA
 //
@@ -1052,9 +1058,18 @@ void ST_diffDraw(void)
     ST_drawWidgets(false);
 }
 
-void ST_Drawer (boolean fullscreen, boolean refresh)
+static void ST_DrawerPass(boolean fullscreen, boolean refresh)
 {
-  
+#ifdef __EMSCRIPTEN__
+    (void) fullscreen;
+    (void) refresh;
+    st_statusbaron = true;
+
+    // HUD overlay buffer is cleared every frame, so draw the full bar each frame.
+    ST_doPaletteStuff();
+    ST_doRefresh();
+    return;
+#else
     st_statusbaron = (!fullscreen) || automapactive;
     st_firsttime = st_firsttime || refresh;
 
@@ -1065,7 +1080,22 @@ void ST_Drawer (boolean fullscreen, boolean refresh)
     if (st_firsttime) ST_doRefresh();
     // Otherwise, update as little as possible
     else ST_diffDraw();
+#endif
+}
 
+void ST_Drawer (boolean fullscreen, boolean refresh)
+{
+#ifdef __EMSCRIPTEN__
+    DG_HudOverlayClear();
+    if (DG_HudOverlayBeginCapture())
+    {
+        ST_DrawerPass(fullscreen, refresh);
+        DG_HudOverlayEndCapture();
+        return;
+    }
+#endif
+
+    ST_DrawerPass(fullscreen, refresh);
 }
 
 typedef void (*load_callback_t)(char *lumpname, patch_t **variable); 
@@ -1413,4 +1443,3 @@ void ST_Init (void)
     ST_loadData();
     st_backing_screen = (byte *) Z_Malloc(ST_WIDTH * ST_HEIGHT, PU_STATIC, 0);
 }
-

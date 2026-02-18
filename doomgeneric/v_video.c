@@ -56,6 +56,8 @@ byte *xlatab = NULL;
 // The screen buffer that the v_video.c code draws to.
 
 static byte *dest_screen = NULL;
+static byte *dest_screen_stack[8];
+static int dest_screen_stack_depth = 0;
 
 int dirtybox[4]; 
 
@@ -599,12 +601,17 @@ void V_Init (void)
     // no-op!
     // There used to be separate screens that could be drawn to; these are
     // now handled in the upper layers.
+    dest_screen_stack_depth = 0;
 }
 
 // Set the buffer that the code draws to.
 
 void V_UseBuffer(byte *buffer)
 {
+    if (dest_screen_stack_depth < (int)(sizeof(dest_screen_stack) / sizeof(dest_screen_stack[0])))
+    {
+        dest_screen_stack[dest_screen_stack_depth++] = dest_screen;
+    }
     dest_screen = buffer;
 }
 
@@ -612,7 +619,14 @@ void V_UseBuffer(byte *buffer)
 
 void V_RestoreBuffer(void)
 {
-    dest_screen = I_VideoBuffer;
+    if (dest_screen_stack_depth > 0)
+    {
+        dest_screen = dest_screen_stack[--dest_screen_stack_depth];
+    }
+    else
+    {
+        dest_screen = I_VideoBuffer;
+    }
 }
 
 //
@@ -929,4 +943,3 @@ void V_DrawMouseSpeedBox(int speed)
     V_DrawVertLine(box_x + redline_x, box_y + 1,
                  MOUSE_SPEED_BOX_HEIGHT - 2, red);
 }
-

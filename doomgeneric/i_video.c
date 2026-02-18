@@ -141,18 +141,77 @@ typedef struct
 static uint16_t rgb565_palette[256];
 
 #ifdef __EMSCRIPTEN__
-// One line of HUD message text in Doom's small font.
-#define DG_MESSAGE_OVERLAY_HEIGHT 8
-#define DG_MENU_TRANSPARENT_INDEX 255
+#define DG_OVERLAY_TRANSPARENT_INDEX 255
 #endif
 
 #ifdef __EMSCRIPTEN__
 void DG_PollResize(void);
 void DG_GetScreenBufferSize(int* width, int* height);
 int dg_emscripten_view_width = SCREENWIDTH;
-int dg_emscripten_view_height = SCREENHEIGHT - ST_HEIGHT;
+int dg_emscripten_view_height = SCREENHEIGHT;
+static byte *dg_hud_overlay_buffer = NULL;
+static boolean dg_hud_overlay_ready = false;
+static byte *dg_message_overlay_buffer = NULL;
+static boolean dg_message_overlay_ready = false;
 static byte *dg_menu_overlay_buffer = NULL;
 static boolean dg_menu_overlay_ready = false;
+
+static int DG_BeginOverlayCapture(byte **overlay_buffer, boolean *overlay_ready)
+{
+    size_t overlay_size = (size_t) SCREENWIDTH * (size_t) SCREENHEIGHT;
+
+    if (*overlay_buffer == NULL)
+    {
+        *overlay_buffer = malloc(overlay_size);
+    }
+
+    if (*overlay_buffer == NULL)
+    {
+        *overlay_ready = false;
+        return 0;
+    }
+
+    memset(*overlay_buffer, DG_OVERLAY_TRANSPARENT_INDEX, overlay_size);
+    *overlay_ready = true;
+    V_UseBuffer(*overlay_buffer);
+
+    return 1;
+}
+
+static void DG_EndOverlayCapture(void)
+{
+    V_RestoreBuffer();
+}
+
+void DG_HudOverlayClear(void)
+{
+    dg_hud_overlay_ready = false;
+}
+
+int DG_HudOverlayBeginCapture(void)
+{
+    return DG_BeginOverlayCapture(&dg_hud_overlay_buffer, &dg_hud_overlay_ready);
+}
+
+void DG_HudOverlayEndCapture(void)
+{
+    DG_EndOverlayCapture();
+}
+
+void DG_MessageOverlayClear(void)
+{
+    dg_message_overlay_ready = false;
+}
+
+int DG_MessageOverlayBeginCapture(void)
+{
+    return DG_BeginOverlayCapture(&dg_message_overlay_buffer, &dg_message_overlay_ready);
+}
+
+void DG_MessageOverlayEndCapture(void)
+{
+    DG_EndOverlayCapture();
+}
 
 void DG_MenuOverlayClear(void)
 {
@@ -161,29 +220,12 @@ void DG_MenuOverlayClear(void)
 
 int DG_MenuOverlayBeginCapture(void)
 {
-    size_t overlay_size = SCREENWIDTH * SCREENHEIGHT;
-
-    if (dg_menu_overlay_buffer == NULL)
-    {
-        dg_menu_overlay_buffer = malloc(overlay_size);
-    }
-
-    if (dg_menu_overlay_buffer == NULL)
-    {
-        dg_menu_overlay_ready = false;
-        return 0;
-    }
-
-    memset(dg_menu_overlay_buffer, DG_MENU_TRANSPARENT_INDEX, overlay_size);
-    dg_menu_overlay_ready = true;
-    V_UseBuffer(dg_menu_overlay_buffer);
-
-    return 1;
+    return DG_BeginOverlayCapture(&dg_menu_overlay_buffer, &dg_menu_overlay_ready);
 }
 
 void DG_MenuOverlayEndCapture(void)
 {
-    V_RestoreBuffer();
+    DG_EndOverlayCapture();
 }
 
 static void I_UpdateFramebufferSize(void)
@@ -207,6 +249,10 @@ static void I_UpdateFramebufferSize(void)
     s_Fb.yres = height;
     s_Fb.xres_virtual = width;
     s_Fb.yres_virtual = height;
+
+    // Keep the software renderer viewport at the full native game buffer.
+    dg_emscripten_view_width = SCREENWIDTH;
+    dg_emscripten_view_height = SCREENHEIGHT;
 }
 #endif
 
@@ -412,6 +458,20 @@ void I_ShutdownGraphics (void)
 	Z_Free (I_VideoBuffer);
 
 #ifdef __EMSCRIPTEN__
+    if (dg_hud_overlay_buffer != NULL)
+    {
+        free(dg_hud_overlay_buffer);
+        dg_hud_overlay_buffer = NULL;
+    }
+    dg_hud_overlay_ready = false;
+
+    if (dg_message_overlay_buffer != NULL)
+    {
+        free(dg_message_overlay_buffer);
+        dg_message_overlay_buffer = NULL;
+    }
+    dg_message_overlay_ready = false;
+
     if (dg_menu_overlay_buffer != NULL)
     {
         free(dg_menu_overlay_buffer);
@@ -508,26 +568,11 @@ void I_FinishUpdate (void)
     int scene_source_height;
     int bytes_per_pixel;
     byte *framebuffer;
-    boolean draw_fixed_hud;
+#ifdef __EMSCRIPTEN__
+    boolean draw_hud_overlay;
     boolean draw_message_overlay;
-    int message_source_x;
-    int message_source_y;
-    int message_dest_x;
-    int message_dest_y;
-    int message_copy_width;
-    int message_copy_height;
     boolean draw_menu_overlay;
-    int menu_dest_x;
-    int menu_dest_y;
-    int menu_src_x;
-    int menu_src_y;
-    int menu_copy_width;
-    int menu_copy_height;
-    int hud_dest_x;
-    int hud_dest_y;
-    int hud_src_x;
-    int hud_copy_width;
-    int hud_copy_height;
+#endif
 
 #ifdef __EMSCRIPTEN__
     I_UpdateFramebufferSize();
@@ -549,46 +594,14 @@ void I_FinishUpdate (void)
     y_offset = ((int)s_Fb.yres - target_height) / 2;
 #endif
 
-    draw_fixed_hud = (gamestate == GS_LEVEL)
-                  && ((viewheight != SCREENHEIGHT) || automapactive);
-    draw_message_overlay = draw_fixed_hud;
-    draw_menu_overlay = false;
-
 #ifdef __EMSCRIPTEN__
-    if (draw_fixed_hud)
-    {
-        scene_source_x = viewwindowx;
-        scene_source_y = viewwindowy;
-        scene_source_width = scaledviewwidth;
-        scene_source_height = viewheight;
-
-        if (draw_message_overlay)
-        {
-            message_source_x = scene_source_x + HU_MSGX;
-            message_source_y = scene_source_y + HU_MSGY;
-
-            // Exclude the message strip from the stretched scene pass.
-            if (scene_source_height > DG_MESSAGE_OVERLAY_HEIGHT)
-            {
-                scene_source_y += DG_MESSAGE_OVERLAY_HEIGHT;
-                scene_source_height -= DG_MESSAGE_OVERLAY_HEIGHT;
-            }
-            else
-            {
-                draw_message_overlay = false;
-            }
-        }
-    }
-    else
-    {
-        scene_source_x = 0;
-        scene_source_y = 0;
-        scene_source_width = SCREENWIDTH;
-        scene_source_height = SCREENHEIGHT;
-        draw_message_overlay = false;
-    }
-
+    draw_hud_overlay = (gamestate == GS_LEVEL) && dg_hud_overlay_ready;
+    draw_message_overlay = (gamestate == GS_LEVEL) && dg_message_overlay_ready;
     draw_menu_overlay = dg_menu_overlay_ready;
+    scene_source_x = 0;
+    scene_source_y = 0;
+    scene_source_width = SCREENWIDTH;
+    scene_source_height = SCREENHEIGHT;
 #else
     scene_source_x = 0;
     scene_source_y = 0;
@@ -645,51 +658,12 @@ void I_FinishUpdate (void)
     if (draw_message_overlay)
     {
         int y_msg;
-
-        message_dest_x = HU_MSGX;
-        message_dest_y = HU_MSGY;
-        message_copy_width = SCREENWIDTH - HU_MSGX;
-        message_copy_height = DG_MESSAGE_OVERLAY_HEIGHT;
-
-        if (message_source_x < 0)
-        {
-            int delta = -message_source_x;
-            message_source_x = 0;
-            message_dest_x += delta;
-            message_copy_width -= delta;
-        }
-
-        if (message_source_y < 0)
-        {
-            int delta = -message_source_y;
-            message_source_y = 0;
-            message_dest_y += delta;
-            message_copy_height -= delta;
-        }
-
-        if (message_source_x + message_copy_width > SCREENWIDTH)
-        {
-            message_copy_width = SCREENWIDTH - message_source_x;
-        }
-        if (message_source_y + message_copy_height > SCREENHEIGHT)
-        {
-            message_copy_height = SCREENHEIGHT - message_source_y;
-        }
-
-        if (message_dest_x < 0)
-        {
-            int delta = -message_dest_x;
-            message_dest_x = 0;
-            message_source_x += delta;
-            message_copy_width -= delta;
-        }
-        if (message_dest_y < 0)
-        {
-            int delta = -message_dest_y;
-            message_dest_y = 0;
-            message_source_y += delta;
-            message_copy_height -= delta;
-        }
+        int message_dest_x = 0;
+        int message_dest_y = 0;
+        int message_src_x = 0;
+        int message_src_y = 0;
+        int message_copy_width = SCREENWIDTH;
+        int message_copy_height = SCREENHEIGHT;
 
         if (message_dest_x + message_copy_width > target_width)
         {
@@ -704,16 +678,22 @@ void I_FinishUpdate (void)
         {
             for (y_msg = 0; y_msg < message_copy_height; ++y_msg)
             {
-                byte *line_in = I_VideoBuffer
-                              + (message_source_y + y_msg) * SCREENWIDTH
-                              + message_source_x;
+                byte *line_in = dg_message_overlay_buffer
+                              + (message_src_y + y_msg) * SCREENWIDTH
+                              + message_src_x;
                 byte *line_out = framebuffer
                                + (((size_t)(message_dest_y + y_msg) * s_Fb.xres)
                                + (size_t)message_dest_x) * bytes_per_pixel;
                 int x_msg;
 
 #ifdef CMAP256
-                memcpy(line_out, line_in, (size_t)message_copy_width);
+                for (x_msg = 0; x_msg < message_copy_width; ++x_msg)
+                {
+                    if (line_in[x_msg] != DG_OVERLAY_TRANSPARENT_INDEX)
+                    {
+                        line_out[x_msg] = line_in[x_msg];
+                    }
+                }
 #else
                 if (s_Fb.bits_per_pixel == 16)
                 {
@@ -721,7 +701,10 @@ void I_FinishUpdate (void)
 
                     for (x_msg = 0; x_msg < message_copy_width; ++x_msg)
                     {
-                        line_out16[x_msg] = I_MapPaletteColor16(line_in[x_msg]);
+                        if (line_in[x_msg] != DG_OVERLAY_TRANSPARENT_INDEX)
+                        {
+                            line_out16[x_msg] = I_MapPaletteColor16(line_in[x_msg]);
+                        }
                     }
                 }
                 else if (s_Fb.bits_per_pixel == 32)
@@ -730,7 +713,10 @@ void I_FinishUpdate (void)
 
                     for (x_msg = 0; x_msg < message_copy_width; ++x_msg)
                     {
-                        line_out32[x_msg] = I_MapPaletteColor32(line_in[x_msg]);
+                        if (line_in[x_msg] != DG_OVERLAY_TRANSPARENT_INDEX)
+                        {
+                            line_out32[x_msg] = I_MapPaletteColor32(line_in[x_msg]);
+                        }
                     }
                 }
 #endif
@@ -738,8 +724,14 @@ void I_FinishUpdate (void)
         }
     }
 
-    if (draw_fixed_hud)
+    if (draw_hud_overlay)
     {
+        int hud_dest_x;
+        int hud_dest_y;
+        int hud_src_x;
+        int hud_copy_width;
+        int hud_copy_height;
+
         hud_dest_x = (target_width - SCREENWIDTH) / 2;
         hud_dest_y = target_height - ST_HEIGHT;
         hud_src_x = 0;
@@ -776,14 +768,17 @@ void I_FinishUpdate (void)
             for (y_hud = 0; y_hud < hud_copy_height; ++y_hud)
             {
                 int src_y = (SCREENHEIGHT - ST_HEIGHT) + y_hud;
-                byte *line_in = I_VideoBuffer + src_y * SCREENWIDTH + hud_src_x;
+                byte *line_in = dg_hud_overlay_buffer + src_y * SCREENWIDTH + hud_src_x;
                 byte *line_out = framebuffer
                                + (((size_t)(hud_dest_y + y_hud) * s_Fb.xres)
                                + (size_t)hud_dest_x) * bytes_per_pixel;
                 int x_hud;
 
 #ifdef CMAP256
-                memcpy(line_out, line_in, (size_t)hud_copy_width);
+                for (x_hud = 0; x_hud < hud_copy_width; ++x_hud)
+                {
+                    line_out[x_hud] = line_in[x_hud];
+                }
 #else
                 if (s_Fb.bits_per_pixel == 16)
                 {
@@ -811,6 +806,12 @@ void I_FinishUpdate (void)
     if (draw_menu_overlay)
     {
         int y_menu;
+        int menu_dest_x;
+        int menu_dest_y;
+        int menu_src_x;
+        int menu_src_y;
+        int menu_copy_width;
+        int menu_copy_height;
 
         menu_dest_x = (target_width - SCREENWIDTH) / 2;
         menu_dest_y = (target_height - SCREENHEIGHT) / 2;
@@ -858,7 +859,7 @@ void I_FinishUpdate (void)
 #ifdef CMAP256
                 for (x_menu = 0; x_menu < menu_copy_width; ++x_menu)
                 {
-                    if (line_in[x_menu] != DG_MENU_TRANSPARENT_INDEX)
+                    if (line_in[x_menu] != DG_OVERLAY_TRANSPARENT_INDEX)
                     {
                         line_out[x_menu] = line_in[x_menu];
                     }
@@ -870,7 +871,7 @@ void I_FinishUpdate (void)
 
                     for (x_menu = 0; x_menu < menu_copy_width; ++x_menu)
                     {
-                        if (line_in[x_menu] != DG_MENU_TRANSPARENT_INDEX)
+                        if (line_in[x_menu] != DG_OVERLAY_TRANSPARENT_INDEX)
                         {
                             line_out16[x_menu] = I_MapPaletteColor16(line_in[x_menu]);
                         }
@@ -882,7 +883,7 @@ void I_FinishUpdate (void)
 
                     for (x_menu = 0; x_menu < menu_copy_width; ++x_menu)
                     {
-                        if (line_in[x_menu] != DG_MENU_TRANSPARENT_INDEX)
+                        if (line_in[x_menu] != DG_OVERLAY_TRANSPARENT_INDEX)
                         {
                             line_out32[x_menu] = I_MapPaletteColor32(line_in[x_menu]);
                         }

@@ -41,6 +41,12 @@
 #include "dstrings.h"
 #include "sounds.h"
 
+#ifdef __EMSCRIPTEN__
+void DG_MessageOverlayClear(void);
+int DG_MessageOverlayBeginCapture(void);
+void DG_MessageOverlayEndCapture(void);
+#endif
+
 //
 // Locally used constants, shortcuts.
 //
@@ -380,14 +386,27 @@ void HU_Start(void)
 
 }
 
-void HU_Drawer(void)
+static void HU_DrawerPass(void)
 {
-
     HUlib_drawSText(&w_message);
     HUlib_drawIText(&w_chat);
     if (automapactive)
 	HUlib_drawTextLine(&w_title, false);
+}
 
+void HU_Drawer(void)
+{
+#ifdef __EMSCRIPTEN__
+    DG_MessageOverlayClear();
+    if (DG_MessageOverlayBeginCapture())
+    {
+        HU_DrawerPass();
+        DG_MessageOverlayEndCapture();
+        return;
+    }
+#endif
+
+    HU_DrawerPass();
 }
 
 void HU_Erase(void)
