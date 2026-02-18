@@ -192,8 +192,12 @@ void D_Display(void)
     // save the current screen if about to wipe
     if (gamestate != wipegamestate)
     {
+#ifdef __EMSCRIPTEN__
+        wipe = false;
+#else
         wipe = true;
         wipe_StartScreen(0, 0, SCREENWIDTH, SCREENHEIGHT);
+#endif
     }
     else
         wipe = false;

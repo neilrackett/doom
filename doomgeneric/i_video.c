@@ -243,6 +243,60 @@ void DG_MenuOverlayEndCapture(void)
     DG_EndOverlayCapture();
 }
 
+static int DG_FindOverlayBounds(byte *overlay,
+                                int *out_x,
+                                int *out_y,
+                                int *out_w,
+                                int *out_h)
+{
+    int x;
+    int y;
+    int min_x = SCREENWIDTH;
+    int min_y = SCREENHEIGHT;
+    int max_x = -1;
+    int max_y = -1;
+
+    for (y = 0; y < SCREENHEIGHT; ++y)
+    {
+        byte *row = overlay + y * SCREENWIDTH;
+
+        for (x = 0; x < SCREENWIDTH; ++x)
+        {
+            if (row[x] != DG_OVERLAY_TRANSPARENT_INDEX)
+            {
+                if (x < min_x)
+                {
+                    min_x = x;
+                }
+                if (x > max_x)
+                {
+                    max_x = x;
+                }
+                if (y < min_y)
+                {
+                    min_y = y;
+                }
+                if (y > max_y)
+                {
+                    max_y = y;
+                }
+            }
+        }
+    }
+
+    if (max_x < min_x || max_y < min_y)
+    {
+        return 0;
+    }
+
+    *out_x = min_x;
+    *out_y = min_y;
+    *out_w = max_x - min_x + 1;
+    *out_h = max_y - min_y + 1;
+
+    return 1;
+}
+
 static void I_UpdateFramebufferSize(void)
 {
     int width = (int)s_Fb.xres;
@@ -751,12 +805,38 @@ void I_FinishUpdate (void)
     if (draw_message_overlay)
     {
         int y_msg;
-        int message_dest_x = 4;
-        int message_dest_y = 4;
+        int message_dest_x;
+        int message_dest_y = ST_HEIGHT + 4;
         int message_src_x = 0;
         int message_src_y = 0;
-        int message_copy_width = SCREENWIDTH;
-        int message_copy_height = SCREENHEIGHT;
+        int message_copy_width = 0;
+        int message_copy_height = 0;
+
+        if (!DG_FindOverlayBounds(dg_message_overlay_buffer,
+                                  &message_src_x,
+                                  &message_src_y,
+                                  &message_copy_width,
+                                  &message_copy_height))
+        {
+            message_copy_width = 0;
+        }
+
+        message_dest_x = (target_width - message_copy_width) / 2;
+
+        if (message_dest_x < 0)
+        {
+            int delta = -message_dest_x;
+            message_dest_x = 0;
+            message_src_x += delta;
+            message_copy_width -= delta;
+        }
+        if (message_dest_y < 0)
+        {
+            int delta = -message_dest_y;
+            message_dest_y = 0;
+            message_src_y += delta;
+            message_copy_height -= delta;
+        }
 
         if (message_dest_x + message_copy_width > target_width)
         {
@@ -826,7 +906,7 @@ void I_FinishUpdate (void)
         int hud_copy_height;
 
         hud_dest_x = (target_width - ST_WIDTH) / 2;
-        hud_dest_y = target_height - ST_HEIGHT;
+        hud_dest_y = 0;
         hud_src_x = 0;
         hud_copy_width = ST_WIDTH;
         hud_copy_height = ST_HEIGHT;
