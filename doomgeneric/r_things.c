@@ -72,8 +72,8 @@ lighttable_t**	spritelights;
 
 // constant arrays
 //  used for psprite clipping and initializing clipping
-short		negonearray[SCREENWIDTH];
-short		screenheightarray[SCREENWIDTH];
+short		negonearray[DOOM_MAX_WIDTH];
+short		screenheightarray[DOOM_MAX_WIDTH];
 
 
 //
@@ -638,6 +638,9 @@ void R_AddSprites (sector_t* sec)
 void R_DrawPSprite (pspdef_t* psp)
 {
     fixed_t		tx;
+    fixed_t		psprite_height_scale;
+    fixed_t		scaled_pspritescale;
+    fixed_t		scaled_pspriteiscale;
     int			x1;
     int			x2;
     spritedef_t*	sprdef;
@@ -663,19 +666,28 @@ void R_DrawPSprite (pspdef_t* psp)
 
     lump = sprframe->lump[0];
     flip = (boolean)sprframe->flip[0];
-    
+
+    psprite_height_scale =
+        FixedDiv((SCREENHEIGHT << FRACBITS), (DOOM_BASE_HEIGHT << FRACBITS));
+    scaled_pspritescale = FixedMul(pspritescale, psprite_height_scale);
+    if (scaled_pspritescale <= 0)
+    {
+        scaled_pspritescale = FRACUNIT;
+    }
+    scaled_pspriteiscale = FixedDiv(FRACUNIT, scaled_pspritescale);
+	
     // calculate edges of the shape
     tx = psp->sx-160*FRACUNIT;
 	
     tx -= spriteoffset[lump];	
-    x1 = (centerxfrac + FixedMul (tx,pspritescale) ) >>FRACBITS;
+    x1 = (centerxfrac + FixedMul (tx, scaled_pspritescale) ) >>FRACBITS;
 
     // off the right side
     if (x1 > viewwidth)
 	return;		
 
     tx +=  spritewidth[lump];
-    x2 = ((centerxfrac + FixedMul (tx, pspritescale) ) >>FRACBITS) - 1;
+    x2 = ((centerxfrac + FixedMul (tx, scaled_pspritescale) ) >>FRACBITS) - 1;
 
     // off the left side
     if (x2 < 0)
@@ -684,19 +696,20 @@ void R_DrawPSprite (pspdef_t* psp)
     // store information in a vissprite
     vis = &avis;
     vis->mobjflags = 0;
-    vis->texturemid = (BASEYCENTER<<FRACBITS)+FRACUNIT/2-(psp->sy-spritetopoffset[lump]);
+    vis->texturemid = (BASEYCENTER << FRACBITS) + FRACUNIT / 2
+                    - (psp->sy - spritetopoffset[lump]);
     vis->x1 = x1 < 0 ? 0 : x1;
     vis->x2 = x2 >= viewwidth ? viewwidth-1 : x2;	
-    vis->scale = pspritescale<<detailshift;
+    vis->scale = scaled_pspritescale<<detailshift;
     
     if (flip)
     {
-	vis->xiscale = -pspriteiscale;
+	vis->xiscale = -scaled_pspriteiscale;
 	vis->startfrac = spritewidth[lump]-1;
     }
     else
     {
-	vis->xiscale = pspriteiscale;
+	vis->xiscale = scaled_pspriteiscale;
 	vis->startfrac = 0;
     }
     
@@ -832,8 +845,8 @@ void R_SortVisSprites (void)
 //
 // R_DrawSprite
 //
-static short		clipbot[SCREENWIDTH];
-static short		cliptop[SCREENWIDTH];
+static short		clipbot[DOOM_MAX_WIDTH];
+static short		cliptop[DOOM_MAX_WIDTH];
 void R_DrawSprite (vissprite_t* spr)
 {
     drawseg_t*		ds;
@@ -977,6 +990,3 @@ void R_DrawMasked (void)
     if (!viewangleoffset)		
 	R_DrawPlayerSprites ();
 }
-
-
-

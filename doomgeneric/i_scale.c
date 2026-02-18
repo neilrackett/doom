@@ -94,7 +94,7 @@ static boolean I_Scale1x(int x1, int y1, int x2, int y2)
 }
 
 screen_mode_t mode_scale_1x = {
-    SCREENWIDTH, SCREENHEIGHT,
+    DOOM_BASE_WIDTH, DOOM_BASE_HEIGHT,
     NULL,
     I_Scale1x,
     false,
@@ -135,7 +135,7 @@ static boolean I_Scale2x(int x1, int y1, int x2, int y2)
 }
 
 screen_mode_t mode_scale_2x = {
-    SCREENWIDTH * 2, SCREENHEIGHT * 2,
+    DOOM_BASE_WIDTH * 2, DOOM_BASE_HEIGHT * 2,
     NULL,
     I_Scale2x,
     false,
@@ -180,7 +180,7 @@ static boolean I_Scale3x(int x1, int y1, int x2, int y2)
 }
 
 screen_mode_t mode_scale_3x = {
-    SCREENWIDTH * 3, SCREENHEIGHT * 3,
+    DOOM_BASE_WIDTH * 3, DOOM_BASE_HEIGHT * 3,
     NULL,
     I_Scale3x,
     false,
@@ -229,7 +229,7 @@ static boolean I_Scale4x(int x1, int y1, int x2, int y2)
 }
 
 screen_mode_t mode_scale_4x = {
-    SCREENWIDTH * 4, SCREENHEIGHT * 4,
+    DOOM_BASE_WIDTH * 4, DOOM_BASE_HEIGHT * 4,
     NULL,
     I_Scale4x,
     false,
@@ -282,7 +282,7 @@ static boolean I_Scale5x(int x1, int y1, int x2, int y2)
 }
 
 screen_mode_t mode_scale_5x = {
-    SCREENWIDTH * 5, SCREENHEIGHT * 5,
+    DOOM_BASE_WIDTH * 5, DOOM_BASE_HEIGHT * 5,
     NULL,
     I_Scale5x,
     false,
@@ -498,7 +498,7 @@ static boolean I_Stretch1x(int x1, int y1, int x2, int y2)
 }
 
 screen_mode_t mode_stretch_1x = {
-    SCREENWIDTH, SCREENHEIGHT_4_3,
+    DOOM_BASE_WIDTH, SCREENHEIGHT_4_3,
     I_InitStretchTables,
     I_Stretch1x,
     true,
@@ -611,7 +611,7 @@ static boolean I_Stretch2x(int x1, int y1, int x2, int y2)
 }
 
 screen_mode_t mode_stretch_2x = {
-    SCREENWIDTH * 2, SCREENHEIGHT_4_3 * 2,
+    DOOM_BASE_WIDTH * 2, SCREENHEIGHT_4_3 * 2,
     I_InitStretchTables,
     I_Stretch2x,
     false,
@@ -750,7 +750,7 @@ static boolean I_Stretch3x(int x1, int y1, int x2, int y2)
 }
 
 screen_mode_t mode_stretch_3x = {
-    SCREENWIDTH * 3, SCREENHEIGHT_4_3 * 3,
+    DOOM_BASE_WIDTH * 3, SCREENHEIGHT_4_3 * 3,
     I_InitStretchTables,
     I_Stretch3x,
     false,
@@ -915,7 +915,7 @@ static boolean I_Stretch4x(int x1, int y1, int x2, int y2)
 }
 
 screen_mode_t mode_stretch_4x = {
-    SCREENWIDTH * 4, SCREENHEIGHT_4_3 * 4,
+    DOOM_BASE_WIDTH * 4, SCREENHEIGHT_4_3 * 4,
     I_InitStretchTables,
     I_Stretch4x,
     false,
@@ -1005,7 +1005,7 @@ static boolean I_Stretch5x(int x1, int y1, int x2, int y2)
 }
 
 screen_mode_t mode_stretch_5x = {
-    SCREENWIDTH * 5, SCREENHEIGHT_4_3 * 5,
+    DOOM_BASE_WIDTH * 5, SCREENHEIGHT_4_3 * 5,
     I_InitStretchTables,
     I_Stretch5x,
     false,
@@ -1085,7 +1085,7 @@ static boolean I_Squash1x(int x1, int y1, int x2, int y2)
 }
 
 screen_mode_t mode_squash_1x = {
-    SCREENWIDTH_4_3, SCREENHEIGHT,
+    SCREENWIDTH_4_3, DOOM_BASE_HEIGHT,
     I_InitStretchTables,
     I_Squash1x,
     true,
@@ -1184,7 +1184,7 @@ static boolean I_Squash2x(int x1, int y1, int x2, int y2)
 }
 
 screen_mode_t mode_squash_2x = {
-    SCREENWIDTH_4_3 * 2, SCREENHEIGHT * 2,
+    SCREENWIDTH_4_3 * 2, DOOM_BASE_HEIGHT * 2,
     I_InitStretchTables,
     I_Squash2x,
     false,
@@ -1378,7 +1378,7 @@ static boolean I_Squash4x(int x1, int y1, int x2, int y2)
 }
 
 screen_mode_t mode_squash_4x = {
-    SCREENWIDTH_4_3 * 4, SCREENHEIGHT * 4,
+    SCREENWIDTH_4_3 * 4, DOOM_BASE_HEIGHT * 4,
     I_InitStretchTables,
     I_Squash4x,
     false,
@@ -1443,10 +1443,9 @@ static boolean I_Squash5x(int x1, int y1, int x2, int y2)
 }
 
 screen_mode_t mode_squash_5x = {
-    SCREENWIDTH_4_3 * 5, SCREENHEIGHT * 5,
+    SCREENWIDTH_4_3 * 5, DOOM_BASE_HEIGHT * 5,
     I_InitStretchTables,
     I_Squash5x,
     false,
 };
-
 

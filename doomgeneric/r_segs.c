@@ -226,8 +226,8 @@ void R_RenderSegLoop (void)
 
 	    if (top <= bottom)
 	    {
-		ceilingplane->top[rw_x] = top;
-		ceilingplane->bottom[rw_x] = bottom;
+		ceilingplane->top[rw_x + 1] = top;
+		ceilingplane->bottom[rw_x + 1] = bottom;
 	    }
 	}
 		
@@ -244,8 +244,8 @@ void R_RenderSegLoop (void)
 		top = ceilingclip[rw_x]+1;
 	    if (top <= bottom)
 	    {
-		floorplane->top[rw_x] = top;
-		floorplane->bottom[rw_x] = bottom;
+		floorplane->top[rw_x + 1] = top;
+		floorplane->bottom[rw_x + 1] = bottom;
 	    }
 	}
 	
@@ -740,4 +740,3 @@ R_StoreWallRange
     }
     ds_p++;
 }
-

@@ -76,6 +76,7 @@ void V_DrawBox(int x, int y, int w, int h, int c);
 // Draw a raw screen lump
 
 void V_DrawRawScreen(byte *raw);
+void V_DrawPatchContain(patch_t *patch);
 
 // Temporarily switch to using a different buffer to draw graphics, etc.
 
@@ -105,4 +106,3 @@ void V_LoadXlaTable(void);
 void V_DrawMouseSpeedBox(int speed);
 
 #endif
-

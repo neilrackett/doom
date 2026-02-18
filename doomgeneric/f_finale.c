@@ -19,6 +19,7 @@
 
 #include <stdio.h>
 #include <ctype.h>
+#include <string.h>
 
 // Functions.
 #include "deh_main.h"
@@ -93,6 +94,15 @@ static textscreen_t textscreens[] =
     { pack_plut, 1, 15, "RROCK13",   P5TEXT},
     { pack_plut, 1, 31, "RROCK19",   P6TEXT},
 };
+
+static void F_DrawBackdropPatch(patch_t *patch)
+{
+#ifdef __EMSCRIPTEN__
+    V_DrawPatchContain(patch);
+#else
+    V_DrawPatch(0, 0, patch);
+#endif
+}
 
 char*	finaletext;
 char*	finaleflat;
@@ -547,7 +557,7 @@ void F_CastDrawer (void)
     patch_t*		patch;
     
     // erase the entire screen to a background
-    V_DrawPatch (0, 0, W_CacheLumpName (DEH_String("BOSSBACK"), PU_CACHE));
+    F_DrawBackdropPatch(W_CacheLumpName(DEH_String("BOSSBACK"), PU_CACHE));
 
     F_CastPrint (DEH_String(castorder[castnum].name));
     
@@ -692,7 +702,7 @@ static void F_ArtScreenDrawer(void)
 
         lumpname = DEH_String(lumpname);
 
-        V_DrawPatch (0, 0, W_CacheLumpName(lumpname, PU_CACHE));
+        F_DrawBackdropPatch(W_CacheLumpName(lumpname, PU_CACHE));
     }
 }
 
@@ -714,5 +724,3 @@ void F_Drawer (void)
             break;
     }
 }
-
-

@@ -427,18 +427,11 @@ typedef struct
   int			lightlevel;
   int			minx;
   int			maxx;
-  
-  // leave pads for [minx-1]/[maxx+1]
-  
-  byte		pad1;
-  // Here lies the rub for all
-  //  dynamic resize/change of resolution.
-  byte		top[SCREENWIDTH];
-  byte		pad2;
-  byte		pad3;
-  // See above.
-  byte		bottom[SCREENWIDTH];
-  byte		pad4;
+
+  // Store as 16-bit to support dynamic heights > 255.
+  // Indexing uses x+1 so [0] and [DOOM_MAX_WIDTH+1] are sentinels.
+  short		top[DOOM_MAX_WIDTH + 2];
+  short		bottom[DOOM_MAX_WIDTH + 2];
 
 } visplane_t;
 

@@ -17,8 +17,10 @@
 //
 
 #include <string.h>
+#include <stdlib.h>
 
 #include "z_zone.h"
+#include "i_system.h"
 #include "i_video.h"
 #include "v_video.h"
 #include "m_random.h"
@@ -49,7 +51,11 @@ wipe_shittyColMajorXform
     int		y;
     short*	dest;
 
-    dest = (short*) Z_Malloc(width*height*2, PU_STATIC, 0);
+    dest = (short*) malloc((size_t) width * (size_t) height * sizeof(short));
+    if (dest == NULL)
+    {
+        I_Error("wipe_shittyColMajorXform: failed to allocate temp buffer");
+    }
 
     for(y=0;y<height;y++)
 	for(x=0;x<width;x++)
@@ -57,7 +63,7 @@ wipe_shittyColMajorXform
 
     memcpy(array, dest, width*height*2);
 
-    Z_Free(dest);
+    free(dest);
 
 }
 
@@ -147,7 +153,11 @@ wipe_initMelt
     
     // setup initial column positions
     // (y<0 => not ready to scroll yet)
-    y = (int *) Z_Malloc(width*sizeof(int), PU_STATIC, 0);
+    y = (int *) malloc((size_t) width * sizeof(int));
+    if (y == NULL)
+    {
+        I_Error("wipe_initMelt: failed to allocate y buffer");
+    }
     y[0] = -(M_Random()%16);
     for (i=1;i<width;i++)
     {
@@ -221,9 +231,12 @@ wipe_exitMelt
   int	height,
   int	ticks )
 {
-    Z_Free(y);
-    Z_Free(wipe_scr_start);
-    Z_Free(wipe_scr_end);
+    free(y);
+    y = NULL;
+    free(wipe_scr_start);
+    wipe_scr_start = NULL;
+    free(wipe_scr_end);
+    wipe_scr_end = NULL;
     return 0;
 }
 
@@ -234,7 +247,11 @@ wipe_StartScreen
   int	width,
   int	height )
 {
-    wipe_scr_start = Z_Malloc(SCREENWIDTH * SCREENHEIGHT, PU_STATIC, NULL);
+    wipe_scr_start = malloc((size_t) SCREENWIDTH * (size_t) SCREENHEIGHT);
+    if (wipe_scr_start == NULL)
+    {
+        I_Error("wipe_StartScreen: failed to allocate start screen");
+    }
     I_ReadScreen(wipe_scr_start);
     return 0;
 }
@@ -246,7 +263,11 @@ wipe_EndScreen
   int	width,
   int	height )
 {
-    wipe_scr_end = Z_Malloc(SCREENWIDTH * SCREENHEIGHT, PU_STATIC, NULL);
+    wipe_scr_end = malloc((size_t) SCREENWIDTH * (size_t) SCREENHEIGHT);
+    if (wipe_scr_end == NULL)
+    {
+        I_Error("wipe_EndScreen: failed to allocate end screen");
+    }
     I_ReadScreen(wipe_scr_end);
     V_DrawBlock(x, y, width, height, wipe_scr_start); // restore start scr.
     return 0;
@@ -291,4 +312,3 @@ wipe_ScreenWipe
 
     return !go;
 }
-

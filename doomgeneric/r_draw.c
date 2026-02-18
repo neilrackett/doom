@@ -38,8 +38,8 @@
 
 
 // ?
-#define MAXWIDTH			1120
-#define MAXHEIGHT			832
+#define MAXWIDTH			DOOM_MAX_WIDTH
+#define MAXHEIGHT			DOOM_MAX_HEIGHT
 
 // status bar height at bottom of screen
 #define SBARHEIGHT		32
@@ -255,7 +255,7 @@ void R_DrawColumnLow (void)
 // Spectre/Invisibility.
 //
 #define FUZZTABLE		50 
-#define FUZZOFF	(SCREENWIDTH)
+#define FUZZOFF	1
 
 
 int	fuzzoffset[FUZZTABLE] =
@@ -325,7 +325,7 @@ void R_DrawFuzzColumn (void)
 	//  a pixel that is either one column
 	//  left or right of the current one.
 	// Add index from colormap to index.
-	*dest = colormaps[6*256+dest[fuzzoffset[fuzzpos]]]; 
+	*dest = colormaps[6*256+dest[fuzzoffset[fuzzpos] * SCREENWIDTH]]; 
 
 	// Clamp table lookup index.
 	if (++fuzzpos == FUZZTABLE) 
@@ -391,7 +391,7 @@ void R_DrawFuzzColumnLow (void)
 	//  a pixel that is either one column
 	//  left or right of the current one.
 	// Add index from colormap to index.
-	*dest = colormaps[6*256+dest[fuzzoffset[fuzzpos]]]; 
+	*dest = colormaps[6*256+dest[fuzzoffset[fuzzpos] * SCREENWIDTH]];
 	*dest2 = colormaps[6*256+dest2[fuzzoffset[fuzzpos]]]; 
 
 	// Clamp table lookup index.
@@ -779,6 +779,15 @@ R_InitBuffer
   int		height ) 
 { 
     int		i; 
+
+    if (width > MAXWIDTH)
+    {
+        width = MAXWIDTH;
+    }
+    if (height > MAXHEIGHT)
+    {
+        height = MAXHEIGHT;
+    }
 
     // Handle resize,
     //  e.g. smaller view windows

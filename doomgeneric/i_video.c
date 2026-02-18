@@ -103,6 +103,8 @@ void I_GetEvent(void);
 // The screen buffer; this is modified to draw things to the screen
 
 byte *I_VideoBuffer = NULL;
+int screenwidth = DOOM_BASE_WIDTH;
+int screenheight = DOOM_BASE_HEIGHT;
 
 // If true, game is running as a screensaver
 
@@ -147,16 +149,24 @@ static uint16_t rgb565_palette[256];
 #ifdef __EMSCRIPTEN__
 void DG_PollResize(void);
 void DG_GetScreenBufferSize(int* width, int* height);
-int dg_emscripten_view_width = SCREENWIDTH;
-int dg_emscripten_view_height = SCREENHEIGHT;
+extern boolean setsizeneeded;
+int dg_emscripten_view_width = DOOM_BASE_WIDTH;
+int dg_emscripten_view_height = DOOM_BASE_HEIGHT;
 static byte *dg_hud_overlay_buffer = NULL;
 static boolean dg_hud_overlay_ready = false;
 static byte *dg_message_overlay_buffer = NULL;
 static boolean dg_message_overlay_ready = false;
 static byte *dg_menu_overlay_buffer = NULL;
 static boolean dg_menu_overlay_ready = false;
+static int dg_overlay_capture_mode = DG_OVERLAY_CAPTURE_NONE;
 
-static int DG_BeginOverlayCapture(byte **overlay_buffer, boolean *overlay_ready)
+int DG_GetOverlayCaptureMode(void)
+{
+    return dg_overlay_capture_mode;
+}
+
+static int DG_BeginOverlayCapture(byte **overlay_buffer, boolean *overlay_ready,
+                                  int overlay_mode)
 {
     size_t overlay_size = (size_t) SCREENWIDTH * (size_t) SCREENHEIGHT;
 
@@ -173,6 +183,7 @@ static int DG_BeginOverlayCapture(byte **overlay_buffer, boolean *overlay_ready)
 
     memset(*overlay_buffer, DG_OVERLAY_TRANSPARENT_INDEX, overlay_size);
     *overlay_ready = true;
+    dg_overlay_capture_mode = overlay_mode;
     V_UseBuffer(*overlay_buffer);
 
     return 1;
@@ -181,6 +192,7 @@ static int DG_BeginOverlayCapture(byte **overlay_buffer, boolean *overlay_ready)
 static void DG_EndOverlayCapture(void)
 {
     V_RestoreBuffer();
+    dg_overlay_capture_mode = DG_OVERLAY_CAPTURE_NONE;
 }
 
 void DG_HudOverlayClear(void)
@@ -190,7 +202,8 @@ void DG_HudOverlayClear(void)
 
 int DG_HudOverlayBeginCapture(void)
 {
-    return DG_BeginOverlayCapture(&dg_hud_overlay_buffer, &dg_hud_overlay_ready);
+    return DG_BeginOverlayCapture(&dg_hud_overlay_buffer, &dg_hud_overlay_ready,
+                                  DG_OVERLAY_CAPTURE_HUD);
 }
 
 void DG_HudOverlayEndCapture(void)
@@ -205,7 +218,8 @@ void DG_MessageOverlayClear(void)
 
 int DG_MessageOverlayBeginCapture(void)
 {
-    return DG_BeginOverlayCapture(&dg_message_overlay_buffer, &dg_message_overlay_ready);
+    return DG_BeginOverlayCapture(&dg_message_overlay_buffer, &dg_message_overlay_ready,
+                                  DG_OVERLAY_CAPTURE_MESSAGE);
 }
 
 void DG_MessageOverlayEndCapture(void)
@@ -220,7 +234,8 @@ void DG_MenuOverlayClear(void)
 
 int DG_MenuOverlayBeginCapture(void)
 {
-    return DG_BeginOverlayCapture(&dg_menu_overlay_buffer, &dg_menu_overlay_ready);
+    return DG_BeginOverlayCapture(&dg_menu_overlay_buffer, &dg_menu_overlay_ready,
+                                  DG_OVERLAY_CAPTURE_MENU);
 }
 
 void DG_MenuOverlayEndCapture(void)
@@ -236,13 +251,63 @@ static void I_UpdateFramebufferSize(void)
     DG_PollResize();
     DG_GetScreenBufferSize(&width, &height);
 
-    if (width < 1)
+    if (width < DOOM_BASE_WIDTH)
     {
-        width = 1;
+        width = DOOM_BASE_WIDTH;
     }
-    if (height < 1)
+    if (height < DOOM_BASE_HEIGHT)
     {
-        height = 1;
+        height = DOOM_BASE_HEIGHT;
+    }
+    if (width > DOOM_MAX_WIDTH)
+    {
+        width = DOOM_MAX_WIDTH;
+    }
+    if (height > DOOM_MAX_HEIGHT)
+    {
+        height = DOOM_MAX_HEIGHT;
+    }
+
+    if (width != screenwidth || height != screenheight)
+    {
+        size_t buffer_size = (size_t) width * (size_t) height;
+        byte *resized = (byte *) realloc(I_VideoBuffer, buffer_size);
+
+        if (resized != NULL)
+        {
+            I_VideoBuffer = resized;
+            memset(I_VideoBuffer, 0, buffer_size);
+            screenwidth = width;
+            screenheight = height;
+            setsizeneeded = true;
+
+            if (dg_hud_overlay_buffer != NULL)
+            {
+                free(dg_hud_overlay_buffer);
+                dg_hud_overlay_buffer = NULL;
+            }
+            dg_hud_overlay_ready = false;
+
+            if (dg_message_overlay_buffer != NULL)
+            {
+                free(dg_message_overlay_buffer);
+                dg_message_overlay_buffer = NULL;
+            }
+            dg_message_overlay_ready = false;
+
+            if (dg_menu_overlay_buffer != NULL)
+            {
+                free(dg_menu_overlay_buffer);
+                dg_menu_overlay_buffer = NULL;
+            }
+            dg_menu_overlay_ready = false;
+        }
+        else
+        {
+            // Keep previous internal size if host memory resize fails.
+            width = screenwidth;
+            height = screenheight;
+        }
     }
 
     s_Fb.xres = width;
@@ -250,9 +315,9 @@ static void I_UpdateFramebufferSize(void)
     s_Fb.xres_virtual = width;
     s_Fb.yres_virtual = height;
 
-    // Keep the software renderer viewport at the full native game buffer.
-    dg_emscripten_view_width = SCREENWIDTH;
-    dg_emscripten_view_height = SCREENHEIGHT;
+    // Keep gameplay viewport matched to the software buffer size.
+    dg_emscripten_view_width = screenwidth;
+    dg_emscripten_view_height = screenheight;
 }
 #endif
 
@@ -362,6 +427,29 @@ void I_InitGraphics (void)
 #ifdef __EMSCRIPTEN__
     DG_GetScreenBufferSize(&fb_width, &fb_height);
 #endif
+    if (fb_width < DOOM_BASE_WIDTH)
+    {
+        fb_width = DOOM_BASE_WIDTH;
+    }
+    if (fb_height < DOOM_BASE_HEIGHT)
+    {
+        fb_height = DOOM_BASE_HEIGHT;
+    }
+    if (fb_width > DOOM_MAX_WIDTH)
+    {
+        fb_width = DOOM_MAX_WIDTH;
+    }
+    if (fb_height > DOOM_MAX_HEIGHT)
+    {
+        fb_height = DOOM_MAX_HEIGHT;
+    }
+
+    screenwidth = fb_width;
+    screenheight = fb_height;
+#ifdef __EMSCRIPTEN__
+    dg_emscripten_view_width = screenwidth;
+    dg_emscripten_view_height = screenheight;
+#endif
 
 	memset(&s_Fb, 0, sizeof(struct FB_ScreenInfo));
 	s_Fb.xres = fb_width;
@@ -426,7 +514,7 @@ void I_InitGraphics (void)
     printf("I_InitGraphics: framebuffer: RGBA: %d%d%d%d, red_off: %d, green_off: %d, blue_off: %d, transp_off: %d\n",
             s_Fb.red.length, s_Fb.green.length, s_Fb.blue.length, s_Fb.transp.length, s_Fb.red.offset, s_Fb.green.offset, s_Fb.blue.offset, s_Fb.transp.offset);
 
-    printf("I_InitGraphics: DOOM screen size: w x h: %d x %d\n", SCREENWIDTH, SCREENHEIGHT);
+    printf("I_InitGraphics: DOOM screen size: w x h: %d x %d\n", screenwidth, screenheight);
 
 
     i = M_CheckParmWithArgs("-scaling", 1);
@@ -445,7 +533,12 @@ void I_InitGraphics (void)
 
 
     /* Allocate screen to draw to */
-	I_VideoBuffer = (byte*)Z_Malloc (SCREENWIDTH * SCREENHEIGHT, PU_STATIC, NULL);  // For DOOM to draw on
+	I_VideoBuffer = (byte*)malloc((size_t) screenwidth * (size_t) screenheight);  // For DOOM to draw on
+    if (I_VideoBuffer == NULL)
+    {
+        I_Error("I_InitGraphics: failed to allocate screen buffer (%d x %d)",
+                screenwidth, screenheight);
+    }
 
 	screenvisible = true;
 
@@ -455,7 +548,8 @@ void I_InitGraphics (void)
 
 void I_ShutdownGraphics (void)
 {
-	Z_Free (I_VideoBuffer);
+	free(I_VideoBuffer);
+    I_VideoBuffer = NULL;
 
 #ifdef __EMSCRIPTEN__
     if (dg_hud_overlay_buffer != NULL)
@@ -483,7 +577,10 @@ void I_ShutdownGraphics (void)
 
 void I_StartFrame (void)
 {
-
+#ifdef __EMSCRIPTEN__
+    // Apply size changes before game rendering starts for this frame.
+    I_UpdateFramebufferSize();
+#endif
 }
 
 void I_StartTic (void)
@@ -574,10 +671,6 @@ void I_FinishUpdate (void)
     boolean draw_menu_overlay;
 #endif
 
-#ifdef __EMSCRIPTEN__
-    I_UpdateFramebufferSize();
-#endif
-
     bytes_per_pixel = s_Fb.bits_per_pixel / 8;
     if (bytes_per_pixel <= 0)
     {
@@ -658,8 +751,8 @@ void I_FinishUpdate (void)
     if (draw_message_overlay)
     {
         int y_msg;
-        int message_dest_x = 0;
-        int message_dest_y = 0;
+        int message_dest_x = 4;
+        int message_dest_y = 4;
         int message_src_x = 0;
         int message_src_y = 0;
         int message_copy_width = SCREENWIDTH;
@@ -732,10 +825,10 @@ void I_FinishUpdate (void)
         int hud_copy_width;
         int hud_copy_height;
 
-        hud_dest_x = (target_width - SCREENWIDTH) / 2;
+        hud_dest_x = (target_width - ST_WIDTH) / 2;
         hud_dest_y = target_height - ST_HEIGHT;
         hud_src_x = 0;
-        hud_copy_width = SCREENWIDTH;
+        hud_copy_width = ST_WIDTH;
         hud_copy_height = ST_HEIGHT;
 
         if (hud_dest_x < 0)
@@ -767,7 +860,7 @@ void I_FinishUpdate (void)
 
             for (y_hud = 0; y_hud < hud_copy_height; ++y_hud)
             {
-                int src_y = (SCREENHEIGHT - ST_HEIGHT) + y_hud;
+                int src_y = ST_Y + y_hud;
                 byte *line_in = dg_hud_overlay_buffer + src_y * SCREENWIDTH + hud_src_x;
                 byte *line_out = framebuffer
                                + (((size_t)(hud_dest_y + y_hud) * s_Fb.xres)
@@ -903,7 +996,7 @@ void I_FinishUpdate (void)
 //
 void I_ReadScreen (byte* scr)
 {
-    memcpy (scr, I_VideoBuffer, SCREENWIDTH * SCREENHEIGHT);
+    memcpy (scr, I_VideoBuffer, (size_t) screenwidth * (size_t) screenheight);
 }
 
 //

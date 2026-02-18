@@ -21,6 +21,7 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <limits.h>
 
 #include "i_system.h"
 #include "z_zone.h"
@@ -37,6 +38,18 @@
 planefunction_t		floorfunc;
 planefunction_t		ceilingfunc;
 
+#define PLANE_SENTINEL SHRT_MAX
+
+static void R_InitPlaneTop(short *top)
+{
+    int i;
+
+    for (i = 0; i < DOOM_MAX_WIDTH + 2; ++i)
+    {
+        top[i] = PLANE_SENTINEL;
+    }
+}
+
 //
 // opening
 //
@@ -49,7 +62,7 @@ visplane_t*		floorplane;
 visplane_t*		ceilingplane;
 
 // ?
-#define MAXOPENINGS	SCREENWIDTH*64
+#define MAXOPENINGS	DOOM_MAX_WIDTH*64
 short			openings[MAXOPENINGS];
 short*			lastopening;
 
@@ -59,15 +72,15 @@ short*			lastopening;
 //  floorclip starts out SCREENHEIGHT
 //  ceilingclip starts out -1
 //
-short			floorclip[SCREENWIDTH];
-short			ceilingclip[SCREENWIDTH];
+short			floorclip[DOOM_MAX_WIDTH];
+short			ceilingclip[DOOM_MAX_WIDTH];
 
 //
 // spanstart holds the start of a plane span
 // initialized to 0 at start
 //
-int			spanstart[SCREENHEIGHT];
-int			spanstop[SCREENHEIGHT];
+int			spanstart[DOOM_MAX_HEIGHT];
+int			spanstop[DOOM_MAX_HEIGHT];
 
 //
 // texture mapping
@@ -75,15 +88,15 @@ int			spanstop[SCREENHEIGHT];
 lighttable_t**		planezlight;
 fixed_t			planeheight;
 
-fixed_t			yslope[SCREENHEIGHT];
-fixed_t			distscale[SCREENWIDTH];
+fixed_t			yslope[DOOM_MAX_HEIGHT];
+fixed_t			distscale[DOOM_MAX_WIDTH];
 fixed_t			basexscale;
 fixed_t			baseyscale;
 
-fixed_t			cachedheight[SCREENHEIGHT];
-fixed_t			cacheddistance[SCREENHEIGHT];
-fixed_t			cachedxstep[SCREENHEIGHT];
-fixed_t			cachedystep[SCREENHEIGHT];
+fixed_t			cachedheight[DOOM_MAX_HEIGHT];
+fixed_t			cacheddistance[DOOM_MAX_HEIGHT];
+fixed_t			cachedxstep[DOOM_MAX_HEIGHT];
+fixed_t			cachedystep[DOOM_MAX_HEIGHT];
 
 
 
@@ -246,7 +259,7 @@ R_FindPlane
     check->minx = SCREENWIDTH;
     check->maxx = -1;
     
-    memset (check->top,0xff,sizeof(check->top));
+    R_InitPlaneTop(check->top);
 		
     return check;
 }
@@ -290,7 +303,7 @@ R_CheckPlane
     }
 
     for (x=intrl ; x<= intrh ; x++)
-	if (pl->top[x] != 0xff)
+	if (pl->top[x + 1] != PLANE_SENTINEL)
 	    break;
 
     if (x > intrh)
@@ -311,7 +324,7 @@ R_CheckPlane
     pl->minx = start;
     pl->maxx = stop;
 
-    memset (pl->top,0xff,sizeof(pl->top));
+    R_InitPlaneTop(pl->top);
 		
     return pl;
 }
@@ -399,8 +412,8 @@ void R_DrawPlanes (void)
 	    dc_texturemid = skytexturemid;
 	    for (x=pl->minx ; x <= pl->maxx ; x++)
 	    {
-		dc_yl = pl->top[x];
-		dc_yh = pl->bottom[x];
+		dc_yl = pl->top[x + 1];
+		dc_yh = pl->bottom[x + 1];
 
 		if (dc_yl <= dc_yh)
 		{
@@ -428,17 +441,15 @@ void R_DrawPlanes (void)
 
 	planezlight = zlight[light];
 
-	pl->top[pl->maxx+1] = 0xff;
-	pl->top[pl->minx-1] = 0xff;
+	pl->top[pl->maxx + 2] = PLANE_SENTINEL;
+	pl->top[pl->minx] = PLANE_SENTINEL;
 		
 	stop = pl->maxx + 1;
 
 	for (x=pl->minx ; x<= stop ; x++)
 	{
-	    R_MakeSpans(x,pl->top[x-1],
-			pl->bottom[x-1],
-			pl->top[x],
-			pl->bottom[x]);
+	    R_MakeSpans(x, pl->top[x], pl->bottom[x],
+			pl->top[x + 1], pl->bottom[x + 1]);
 	}
 	
         W_ReleaseLumpNum(lumpnum);

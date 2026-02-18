@@ -3,6 +3,7 @@
 #include "doomkeys.h"
 #include "m_argv.h"
 #include "doomgeneric.h"
+#include "i_video.h"
 
 #include <ctype.h>
 #include <stdio.h>
@@ -15,12 +16,16 @@
 #include <emscripten.h>
 #include <emscripten/html5.h>
 
-#ifndef DOOM_PIXEL_RATIO
-#define DOOM_PIXEL_RATIO 2
+#ifndef DOOM_PIXEL_RATIO_DEFAULT
+#ifdef DOOM_PIXEL_RATIO
+#define DOOM_PIXEL_RATIO_DEFAULT DOOM_PIXEL_RATIO
+#else
+#define DOOM_PIXEL_RATIO_DEFAULT 2
+#endif
 #endif
 
-#if DOOM_PIXEL_RATIO < 1
-#error "DOOM_PIXEL_RATIO must be >= 1"
+#if DOOM_PIXEL_RATIO_DEFAULT < 1
+#error "DOOM_PIXEL_RATIO_DEFAULT must be >= 1"
 #endif
 
 SDL_Window* window = NULL;
@@ -60,8 +65,8 @@ static unsigned char s_GamepadKeyRefCount[256];
 static unsigned char s_GamepadButtonState[GAMEPAD_MAPPED_BUTTON_COUNT];
 static int s_RenderWidth = DOOMGENERIC_RESX;
 static int s_RenderHeight = DOOMGENERIC_RESY;
-static int s_CanvasWidth = DOOMGENERIC_RESX * DOOM_PIXEL_RATIO;
-static int s_CanvasHeight = DOOMGENERIC_RESY * DOOM_PIXEL_RATIO;
+static int s_CanvasWidth = DOOMGENERIC_RESX;
+static int s_CanvasHeight = DOOMGENERIC_RESY;
 static int s_TextureNeedsResize = 1;
 
 typedef struct
@@ -99,6 +104,13 @@ EM_JS(void, dg_query_canvas_size,
   var cssWidth = 0;
   var cssHeight = 0;
   var parent = null;
+  var runtimeRatio = Module["doomPixelRatio"];
+
+  if (typeof runtimeRatio === "number" && isFinite(runtimeRatio)) {
+    ratio = runtimeRatio;
+  }
+
+  ratio = Math.max(1, Math.floor(ratio));
 
   if (canvas) {
     parent = canvas.parentElement || canvas;
@@ -133,6 +145,33 @@ EM_JS(void, dg_query_canvas_size,
   HEAP32[outRenderHeight >> 2] = renderHeight;
   HEAP32[outCanvasWidth >> 2] = canvasWidth;
   HEAP32[outCanvasHeight >> 2] = canvasHeight;
+});
+
+EM_JS(void, dg_install_pixel_ratio_api, (int defaultRatio), {
+  var fallback = defaultRatio > 0 ? defaultRatio : 1;
+  fallback = Math.max(1, Math.floor(fallback));
+
+  if (typeof Module["doomPixelRatio"] !== "number" || !isFinite(Module["doomPixelRatio"])) {
+    Module["doomPixelRatio"] = fallback;
+  } else {
+    Module["doomPixelRatio"] = Math.max(1, Math.floor(Module["doomPixelRatio"]));
+  }
+
+  if (typeof Module["setPixelRatio"] !== "function") {
+    Module["setPixelRatio"] = function (value) {
+      var ratio = Number(value);
+      if (!isFinite(ratio)) {
+        return;
+      }
+      Module["doomPixelRatio"] = Math.max(1, Math.floor(ratio));
+    };
+  }
+
+  if (typeof Module["getPixelRatio"] !== "function") {
+    Module["getPixelRatio"] = function () {
+      return Module["doomPixelRatio"];
+    };
+  }
 });
 
 static void createOrResizeTexture()
@@ -184,7 +223,7 @@ void DG_PollResize(void)
   int canvasWidth = s_CanvasWidth;
   int canvasHeight = s_CanvasHeight;
 
-  dg_query_canvas_size(DOOM_PIXEL_RATIO,
+  dg_query_canvas_size(DOOM_PIXEL_RATIO_DEFAULT,
                        &renderWidth,
                        &renderHeight,
                        &canvasWidth,
@@ -205,6 +244,23 @@ void DG_PollResize(void)
   if (canvasHeight < 1)
   {
     canvasHeight = 1;
+  }
+
+  if (renderWidth < DOOM_BASE_WIDTH)
+  {
+    renderWidth = DOOM_BASE_WIDTH;
+  }
+  if (renderHeight < DOOM_BASE_HEIGHT)
+  {
+    renderHeight = DOOM_BASE_HEIGHT;
+  }
+  if (renderWidth > DOOM_MAX_WIDTH)
+  {
+    renderWidth = DOOM_MAX_WIDTH;
+  }
+  if (renderHeight > DOOM_MAX_HEIGHT)
+  {
+    renderHeight = DOOM_MAX_HEIGHT;
   }
 
   if (renderWidth != s_RenderWidth || renderHeight != s_RenderHeight)
@@ -720,6 +776,7 @@ void DG_Init()
   emscripten_set_gamepadconnected_callback(NULL, false, onGamepadConnected);
   emscripten_set_gamepaddisconnected_callback(NULL, false, onGamepadDisconnected);
   SDL_SetHint(SDL_HINT_RENDER_SCALE_QUALITY, "0");
+  dg_install_pixel_ratio_api(DOOM_PIXEL_RATIO_DEFAULT);
 
   DG_PollResize();
 

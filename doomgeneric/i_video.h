@@ -24,8 +24,26 @@
 
 // Screen width and height.
 
-#define SCREENWIDTH  320
-#define SCREENHEIGHT 200
+#define DOOM_BASE_WIDTH  320
+#define DOOM_BASE_HEIGHT 200
+
+#define DOOM_MAX_WIDTH   2048
+#define DOOM_MAX_HEIGHT  1536
+
+extern int screenwidth;
+extern int screenheight;
+
+#define SCREENWIDTH  (screenwidth)
+#define SCREENHEIGHT (screenheight)
+
+#ifdef __EMSCRIPTEN__
+#define DG_OVERLAY_CAPTURE_NONE    0
+#define DG_OVERLAY_CAPTURE_HUD     1
+#define DG_OVERLAY_CAPTURE_MESSAGE 2
+#define DG_OVERLAY_CAPTURE_MENU    3
+
+int DG_GetOverlayCaptureMode(void);
+#endif
 
 // Screen width used for "squash" scale functions
 

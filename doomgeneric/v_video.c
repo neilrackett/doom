@@ -20,6 +20,7 @@
 //
 
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <math.h>
 
@@ -39,6 +40,22 @@
 #include "config.h"
 #ifdef HAVE_LIBPNG
 #include <png.h>
+#endif
+
+#ifdef __EMSCRIPTEN__
+extern boolean menuactive;
+extern int messageToPrint;
+
+static void DG_AdjustMenuOverlayCoords(int *x, int *y)
+{
+    if (DG_GetOverlayCaptureMode() == DG_OVERLAY_CAPTURE_MENU
+     && menuactive
+     && !messageToPrint)
+    {
+        *x += (SCREENWIDTH - DOOM_BASE_WIDTH) / 2;
+        *y += (SCREENHEIGHT - DOOM_BASE_HEIGHT) / 2;
+    }
+}
 #endif
 
 // TODO: There are separate RANGECHECK defines for different games, but this
@@ -148,6 +165,10 @@ void V_DrawPatch(int x, int y, patch_t *patch)
     byte *source;
     int w;
 
+#ifdef __EMSCRIPTEN__
+    DG_AdjustMenuOverlayCoords(&x, &y);
+#endif
+
     y -= SHORT(patch->topoffset);
     x -= SHORT(patch->leftoffset);
 
@@ -164,7 +185,95 @@ void V_DrawPatch(int x, int y, patch_t *patch)
      || y < 0
      || y + SHORT(patch->height) > SCREENHEIGHT)
     {
+#ifdef __EMSCRIPTEN__
+        int patch_w = SHORT(patch->width);
+        int patch_h = SHORT(patch->height);
+
+        for (col = 0; col < patch_w; ++col)
+        {
+            int destx = x + col;
+
+            if (destx < 0 || destx >= SCREENWIDTH)
+            {
+                continue;
+            }
+
+            column = (column_t *)((byte *)patch + LONG(patch->columnofs[col]));
+
+            while (column->topdelta != 0xff)
+            {
+                int top = y + column->topdelta;
+                int draw_count = column->length;
+
+                source = (byte *)column + 3;
+
+                if (top < 0)
+                {
+                    int skip = -top;
+
+                    if (skip >= draw_count)
+                    {
+                        column = (column_t *)((byte *)column + column->length + 4);
+                        continue;
+                    }
+
+                    source += skip;
+                    draw_count -= skip;
+                    top = 0;
+                }
+
+                if (top >= SCREENHEIGHT)
+                {
+                    column = (column_t *)((byte *)column + column->length + 4);
+                    continue;
+                }
+
+                if (top + draw_count > SCREENHEIGHT)
+                {
+                    draw_count = SCREENHEIGHT - top;
+                }
+
+                if (draw_count > 0)
+                {
+                    dest = dest_screen + top * SCREENWIDTH + destx;
+
+                    while (draw_count--)
+                    {
+                        *dest = *source++;
+                        dest += SCREENWIDTH;
+                    }
+                }
+
+                column = (column_t *)((byte *)column + column->length + 4);
+            }
+        }
+
+        if (x < SCREENWIDTH && y < SCREENHEIGHT
+         && x + patch_w > 0 && y + patch_h > 0)
+        {
+            int mark_x = x < 0 ? 0 : x;
+            int mark_y = y < 0 ? 0 : y;
+            int mark_w = patch_w;
+            int mark_h = patch_h;
+
+            if (mark_x + mark_w > SCREENWIDTH)
+            {
+                mark_w = SCREENWIDTH - mark_x;
+            }
+            if (mark_y + mark_h > SCREENHEIGHT)
+            {
+                mark_h = SCREENHEIGHT - mark_y;
+            }
+            if (mark_w > 0 && mark_h > 0)
+            {
+                V_MarkRect(mark_x, mark_y, mark_w, mark_h);
+            }
+        }
+
+        return;
+#else
         I_Error("Bad V_DrawPatch x=%i y=%i patch.width=%i patch.height=%i topoffset=%i leftoffset=%i", x, y, patch->width, patch->height, patch->topoffset, patch->leftoffset);
+#endif
     }
 #endif
 
@@ -212,6 +321,10 @@ void V_DrawPatchFlipped(int x, int y, patch_t *patch)
     byte *source; 
     int w; 
  
+#ifdef __EMSCRIPTEN__
+    DG_AdjustMenuOverlayCoords(&x, &y);
+#endif
+
     y -= SHORT(patch->topoffset); 
     x -= SHORT(patch->leftoffset); 
 
@@ -228,7 +341,97 @@ void V_DrawPatchFlipped(int x, int y, patch_t *patch)
      || y < 0
      || y + SHORT(patch->height) > SCREENHEIGHT)
     {
+#ifdef __EMSCRIPTEN__
+        int patch_w = SHORT(patch->width);
+        int patch_h = SHORT(patch->height);
+        int src_col;
+
+        for (col = 0; col < patch_w; ++col)
+        {
+            int destx = x + col;
+
+            if (destx < 0 || destx >= SCREENWIDTH)
+            {
+                continue;
+            }
+
+            src_col = patch_w - 1 - col;
+            column = (column_t *)((byte *)patch + LONG(patch->columnofs[src_col]));
+
+            while (column->topdelta != 0xff)
+            {
+                int top = y + column->topdelta;
+                int draw_count = column->length;
+
+                source = (byte *)column + 3;
+
+                if (top < 0)
+                {
+                    int skip = -top;
+
+                    if (skip >= draw_count)
+                    {
+                        column = (column_t *)((byte *)column + column->length + 4);
+                        continue;
+                    }
+
+                    source += skip;
+                    draw_count -= skip;
+                    top = 0;
+                }
+
+                if (top >= SCREENHEIGHT)
+                {
+                    column = (column_t *)((byte *)column + column->length + 4);
+                    continue;
+                }
+
+                if (top + draw_count > SCREENHEIGHT)
+                {
+                    draw_count = SCREENHEIGHT - top;
+                }
+
+                if (draw_count > 0)
+                {
+                    dest = dest_screen + top * SCREENWIDTH + destx;
+
+                    while (draw_count--)
+                    {
+                        *dest = *source++;
+                        dest += SCREENWIDTH;
+                    }
+                }
+
+                column = (column_t *)((byte *)column + column->length + 4);
+            }
+        }
+
+        if (x < SCREENWIDTH && y < SCREENHEIGHT
+         && x + patch_w > 0 && y + patch_h > 0)
+        {
+            int mark_x = x < 0 ? 0 : x;
+            int mark_y = y < 0 ? 0 : y;
+            int mark_w = patch_w;
+            int mark_h = patch_h;
+
+            if (mark_x + mark_w > SCREENWIDTH)
+            {
+                mark_w = SCREENWIDTH - mark_x;
+            }
+            if (mark_y + mark_h > SCREENHEIGHT)
+            {
+                mark_h = SCREENHEIGHT - mark_y;
+            }
+            if (mark_w > 0 && mark_h > 0)
+            {
+                V_MarkRect(mark_x, mark_y, mark_w, mark_h);
+            }
+        }
+
+        return;
+#else
         I_Error("Bad V_DrawPatchFlipped");
+#endif
     }
 #endif
 
@@ -591,6 +794,102 @@ void V_DrawBox(int x, int y, int w, int h, int c)
 void V_DrawRawScreen(byte *raw)
 {
     memcpy(dest_screen, raw, SCREENWIDTH * SCREENHEIGHT);
+}
+
+void V_DrawPatchContain(patch_t *patch)
+{
+    int src_w;
+    int src_h;
+    int dst_w;
+    int dst_h;
+    int dst_x;
+    int dst_y;
+    int dx;
+    int dy;
+    byte *src_pixels;
+
+    src_w = SHORT(patch->width);
+    src_h = SHORT(patch->height);
+
+    if (src_w <= 0 || src_h <= 0)
+    {
+        return;
+    }
+
+    src_pixels = malloc((size_t) src_w * (size_t) src_h);
+    if (src_pixels == NULL)
+    {
+        return;
+    }
+
+    memset(src_pixels, 0, (size_t) src_w * (size_t) src_h);
+
+    for (dx = 0; dx < src_w; ++dx)
+    {
+        column_t *column = (column_t *)((byte *)patch + LONG(patch->columnofs[dx]));
+
+        while (column->topdelta != 0xff)
+        {
+            int top = column->topdelta;
+            int count = column->length;
+            int i;
+            byte *source = (byte *)column + 3;
+
+            for (i = 0; i < count; ++i)
+            {
+                int sy = top + i;
+
+                if (sy >= 0 && sy < src_h)
+                {
+                    src_pixels[sy * src_w + dx] = source[i];
+                }
+            }
+
+            column = (column_t *)((byte *)column + column->length + 4);
+        }
+    }
+
+    if ((long long) SCREENWIDTH * (long long) src_h
+     <= (long long) SCREENHEIGHT * (long long) src_w)
+    {
+        dst_w = SCREENWIDTH;
+        dst_h = (int) (((long long) dst_w * src_h) / src_w);
+    }
+    else
+    {
+        dst_h = SCREENHEIGHT;
+        dst_w = (int) (((long long) dst_h * src_w) / src_h);
+    }
+
+    if (dst_w < 1)
+    {
+        dst_w = 1;
+    }
+    if (dst_h < 1)
+    {
+        dst_h = 1;
+    }
+
+    dst_x = (SCREENWIDTH - dst_w) / 2;
+    dst_y = (SCREENHEIGHT - dst_h) / 2;
+
+    memset(dest_screen, 0, (size_t) SCREENWIDTH * (size_t) SCREENHEIGHT);
+
+    for (dy = 0; dy < dst_h; ++dy)
+    {
+        int sy = (dy * src_h) / dst_h;
+        byte *dst_line = dest_screen + (dst_y + dy) * SCREENWIDTH + dst_x;
+        byte *src_line = src_pixels + sy * src_w;
+
+        for (dx = 0; dx < dst_w; ++dx)
+        {
+            int sx = (dx * src_w) / dst_w;
+            dst_line[dx] = src_line[sx];
+        }
+    }
+
+    V_MarkRect(0, 0, SCREENWIDTH, SCREENHEIGHT);
+    free(src_pixels);
 }
 
 //

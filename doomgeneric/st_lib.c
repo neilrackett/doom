@@ -48,6 +48,23 @@ extern boolean		automapactive;
 //
 patch_t*		sttminus;
 
+static void STlib_CopyFromBacking(int srcx, int srcy,
+                                  int width, int height,
+                                  int destx, int desty)
+{
+#ifdef __EMSCRIPTEN__
+    int row;
+
+    for (row = 0; row < height; ++row)
+    {
+        byte *line = st_backing_screen + (srcy + row) * SCREENWIDTH + srcx;
+        V_DrawBlock(destx, desty + row, width, 1, line);
+    }
+#else
+    V_CopyRect(srcx, srcy, st_backing_screen, width, height, destx, desty);
+#endif
+}
+
 void STlib_init(void)
 {
     sttminus = (patch_t *) W_CacheLumpName(DEH_String("STTMINUS"), PU_STATIC);
@@ -115,7 +132,7 @@ STlib_drawNum
     if (n->y - ST_Y < 0)
 	I_Error("drawNum: n->y - ST_Y < 0");
 
-    V_CopyRect(x, n->y - ST_Y, st_backing_screen, w*numdigits, h, x, n->y);
+    STlib_CopyFromBacking(x, n->y - ST_Y, w * numdigits, h, x, n->y);
 
     // if non-number, do not draw it
     if (num == 1994)
@@ -223,7 +240,7 @@ STlib_updateMultIcon
 	    if (y - ST_Y < 0)
 		I_Error("updateMultIcon: y - ST_Y < 0");
 
-	    V_CopyRect(x, y-ST_Y, st_backing_screen, w, h, x, y);
+	    STlib_CopyFromBacking(x, y - ST_Y, w, h, x, y);
 	}
 	V_DrawPatch(mi->x, mi->y, mi->p[*mi->inum]);
 	mi->oldinum = *mi->inum;
@@ -275,10 +292,9 @@ STlib_updateBinIcon
 	if (*bi->val)
 	    V_DrawPatch(bi->x, bi->y, bi->p);
 	else
-	    V_CopyRect(x, y-ST_Y, st_backing_screen, w, h, x, y);
+	    STlib_CopyFromBacking(x, y - ST_Y, w, h, x, y);
 
 	bi->oldval = *bi->val;
     }
 
 }
-

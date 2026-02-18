@@ -95,7 +95,7 @@ int			viewangletox[FINEANGLES/2];
 // The xtoviewangleangle[] table maps a screen pixel
 // to the lowest viewangle that maps back to x ranges
 // from clipangle to -clipangle.
-angle_t			xtoviewangle[SCREENWIDTH+1];
+angle_t			xtoviewangle[DOOM_MAX_WIDTH+1];
 
 lighttable_t*		scalelight[LIGHTLEVELS][MAXLIGHTSCALE];
 lighttable_t*		scalelightfixed[MAXLIGHTSCALE];
@@ -752,7 +752,10 @@ void R_ExecuteSetViewSize (void)
     
     // thing clipping
     for (i=0 ; i<viewwidth ; i++)
+    {
+	negonearray[i] = -1;
 	screenheightarray[i] = viewheight;
+    }
     
     // planes
     for (i=0 ; i<viewheight ; i++)

@@ -21,6 +21,8 @@
 
 
 #include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 
 #include "i_system.h"
 #include "i_video.h"
@@ -424,6 +426,23 @@ void ST_refreshBackground(void)
 
     if (st_statusbaron)
     {
+#ifdef __EMSCRIPTEN__
+        // Keep backing-screen content current for STlib erase restores.
+        V_UseBuffer(st_backing_screen);
+        V_DrawPatch(ST_X, 0, sbar);
+        if (netgame)
+        {
+            V_DrawPatch(ST_FX, 0, faceback);
+        }
+        V_RestoreBuffer();
+
+        // Draw visible base bar directly in the HUD overlay target.
+        V_DrawPatch(ST_X, ST_Y, sbar);
+        if (netgame)
+        {
+            V_DrawPatch(ST_FX, ST_Y, faceback);
+        }
+#else
         V_UseBuffer(st_backing_screen);
 
 	V_DrawPatch(ST_X, 0, sbar);
@@ -434,6 +453,7 @@ void ST_refreshBackground(void)
         V_RestoreBuffer();
 
 	V_CopyRect(ST_X, 0, st_backing_screen, ST_WIDTH, ST_HEIGHT, ST_X, ST_Y);
+#endif
     }
 
 }
@@ -1441,5 +1461,14 @@ void ST_Stop (void)
 void ST_Init (void)
 {
     ST_loadData();
+#ifdef __EMSCRIPTEN__
+    st_backing_screen = (byte *) malloc((size_t)DOOM_MAX_WIDTH * (size_t)DOOM_MAX_HEIGHT);
+    if (st_backing_screen == NULL)
+    {
+        I_Error("ST_Init: failed to allocate status bar backing buffer");
+    }
+    memset(st_backing_screen, 0, (size_t)DOOM_MAX_WIDTH * (size_t)DOOM_MAX_HEIGHT);
+#else
     st_backing_screen = (byte *) Z_Malloc(ST_WIDTH * ST_HEIGHT, PU_STATIC, 0);
+#endif
 }
