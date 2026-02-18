@@ -27,13 +27,19 @@
       left: 40px;
       min-width: 320px;
       min-height: 200px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
     }
 
     #canvas {
       width: 100%;
       height: 100%;
+      display: block;
       image-rendering: pixelated;
-      background: #F0F;
+      image-rendering: crisp-edges;
+      background: #000;
       outline: none;
     }
   </style>
@@ -41,7 +47,7 @@
 
 <body>
   <div id="viewport">
-    <canvas id="canvas" width="320" height="200" tabindex="-1"></canvas>
+    <canvas id="canvas" width="1" height="1" tabindex="-1"></canvas>
   </div>
   <script>
     var Module = {

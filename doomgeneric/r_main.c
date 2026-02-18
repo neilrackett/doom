@@ -649,6 +649,11 @@ boolean		setsizeneeded;
 int		setblocks;
 int		setdetail;
 
+#ifdef __EMSCRIPTEN__
+extern int dg_emscripten_view_width;
+extern int dg_emscripten_view_height;
+#endif
+
 
 void
 R_SetViewSize
@@ -656,7 +661,12 @@ R_SetViewSize
   int		detail )
 {
     setsizeneeded = true;
+#ifdef __EMSCRIPTEN__
+    // Keep a fixed full-width gameplay viewport in the web port.
+    setblocks = 10;
+#else
     setblocks = blocks;
+#endif
     setdetail = detail;
 }
 
@@ -675,6 +685,27 @@ void R_ExecuteSetViewSize (void)
 
     setsizeneeded = false;
 
+#ifdef __EMSCRIPTEN__
+    scaledviewwidth = dg_emscripten_view_width;
+    viewheight = dg_emscripten_view_height;
+
+    if (scaledviewwidth < 1)
+    {
+        scaledviewwidth = 1;
+    }
+    if (viewheight < 1)
+    {
+        viewheight = 1;
+    }
+    if (scaledviewwidth > SCREENWIDTH)
+    {
+        scaledviewwidth = SCREENWIDTH;
+    }
+    if (viewheight > SCREENHEIGHT)
+    {
+        viewheight = SCREENHEIGHT;
+    }
+#else
     if (setblocks == 11)
     {
 	scaledviewwidth = SCREENWIDTH;
@@ -685,6 +716,7 @@ void R_ExecuteSetViewSize (void)
 	scaledviewwidth = setblocks*32;
 	viewheight = (setblocks*168/10)&~7;
     }
+#endif
     
     detailshift = setdetail;
     viewwidth = scaledviewwidth>>detailshift;

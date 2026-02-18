@@ -817,6 +817,17 @@ void R_FillBackScreen (void)
     int		y; 
     patch_t*	patch;
 
+#ifdef __EMSCRIPTEN__
+    // Web path composites viewport + HUD without vanilla bezel borders.
+    if (background_buffer != NULL)
+    {
+        Z_Free(background_buffer);
+        background_buffer = NULL;
+    }
+
+    return;
+#endif
+
     // DOOM border patch.
     char       *name1 = DEH_String("FLOOR7_2");
 
@@ -944,6 +955,10 @@ void R_DrawViewBorder (void)
     int		side;
     int		ofs;
     int		i; 
+
+#ifdef __EMSCRIPTEN__
+    return;
+#endif
  
     if (scaledviewwidth == SCREENWIDTH) 
 	return; 

@@ -6,6 +6,7 @@
 
 #include <ctype.h>
 #include <stdio.h>
+#include <string.h>
 #include <unistd.h>
 
 #include <stdbool.h>
@@ -13,6 +14,14 @@
 
 #include <emscripten.h>
 #include <emscripten/html5.h>
+
+#ifndef DOOM_PIXEL_RATIO
+#define DOOM_PIXEL_RATIO 2
+#endif
+
+#if DOOM_PIXEL_RATIO < 1
+#error "DOOM_PIXEL_RATIO must be >= 1"
+#endif
 
 SDL_Window* window = NULL;
 SDL_Renderer* renderer = NULL;
@@ -49,6 +58,11 @@ static unsigned int s_KeyQueueReadIndex = 0;
 static int s_ActiveGamepadIndex = -1;
 static unsigned char s_GamepadKeyRefCount[256];
 static unsigned char s_GamepadButtonState[GAMEPAD_MAPPED_BUTTON_COUNT];
+static int s_RenderWidth = DOOMGENERIC_RESX;
+static int s_RenderHeight = DOOMGENERIC_RESY;
+static int s_CanvasWidth = DOOMGENERIC_RESX * DOOM_PIXEL_RATIO;
+static int s_CanvasHeight = DOOMGENERIC_RESY * DOOM_PIXEL_RATIO;
+static int s_TextureNeedsResize = 1;
 
 typedef struct
 {
@@ -76,6 +90,151 @@ static trigger_binding_t s_TriggerBindings[] = {
     {GAMEPAD_BUTTON_LEFT_TRIGGER, KEY_LALT, 0},
     {GAMEPAD_BUTTON_RIGHT_TRIGGER, KEY_FIRE, 0},
 };
+
+EM_JS(void, dg_query_canvas_size,
+      (int pixelRatio, int* outRenderWidth, int* outRenderHeight, int* outCanvasWidth, int* outCanvasHeight),
+{
+  var canvas = Module["canvas"];
+  var ratio = pixelRatio > 0 ? pixelRatio : 1;
+  var cssWidth = 0;
+  var cssHeight = 0;
+  var parent = null;
+
+  if (canvas) {
+    parent = canvas.parentElement || canvas;
+    if (parent) {
+      cssWidth = parent.clientWidth || 0;
+      cssHeight = parent.clientHeight || 0;
+
+      if (cssWidth === 0 || cssHeight === 0) {
+        var rect = parent.getBoundingClientRect();
+        cssWidth = Math.floor(rect.width);
+        cssHeight = Math.floor(rect.height);
+      }
+    }
+  }
+
+  if (!cssWidth || !cssHeight) {
+    cssWidth = window.innerWidth || 1;
+    cssHeight = window.innerHeight || 1;
+  }
+
+  cssWidth = Math.max(1, cssWidth | 0);
+  cssHeight = Math.max(1, cssHeight | 0);
+
+  var renderWidth = Math.max(1, Math.floor(cssWidth / ratio));
+  var renderHeight = Math.max(1, Math.floor(cssHeight / ratio));
+
+  // Apply pixel ratio at the canvas backing-store level.
+  var canvasWidth = renderWidth;
+  var canvasHeight = renderHeight;
+
+  HEAP32[outRenderWidth >> 2] = renderWidth;
+  HEAP32[outRenderHeight >> 2] = renderHeight;
+  HEAP32[outCanvasWidth >> 2] = canvasWidth;
+  HEAP32[outCanvasHeight >> 2] = canvasHeight;
+});
+
+static void createOrResizeTexture()
+{
+  if (renderer == NULL || !s_TextureNeedsResize)
+  {
+    return;
+  }
+
+  if (texture != NULL)
+  {
+    SDL_DestroyTexture(texture);
+    texture = NULL;
+  }
+
+  texture = SDL_CreateTexture(renderer,
+                              SDL_PIXELFORMAT_RGB888,
+                              SDL_TEXTUREACCESS_STREAMING,
+                              s_RenderWidth,
+                              s_RenderHeight);
+
+  if (texture == NULL)
+  {
+    fprintf(stderr, "Failed to create render texture: %s\n", SDL_GetError());
+    return;
+  }
+
+  SDL_SetTextureBlendMode(texture, SDL_BLENDMODE_NONE);
+  s_TextureNeedsResize = 0;
+}
+
+void DG_GetScreenBufferSize(int* width, int* height)
+{
+  if (width != NULL)
+  {
+    *width = s_RenderWidth;
+  }
+
+  if (height != NULL)
+  {
+    *height = s_RenderHeight;
+  }
+}
+
+void DG_PollResize(void)
+{
+  int renderWidth = s_RenderWidth;
+  int renderHeight = s_RenderHeight;
+  int canvasWidth = s_CanvasWidth;
+  int canvasHeight = s_CanvasHeight;
+
+  dg_query_canvas_size(DOOM_PIXEL_RATIO,
+                       &renderWidth,
+                       &renderHeight,
+                       &canvasWidth,
+                       &canvasHeight);
+
+  if (renderWidth < 1)
+  {
+    renderWidth = 1;
+  }
+  if (renderHeight < 1)
+  {
+    renderHeight = 1;
+  }
+  if (canvasWidth < 1)
+  {
+    canvasWidth = 1;
+  }
+  if (canvasHeight < 1)
+  {
+    canvasHeight = 1;
+  }
+
+  if (renderWidth != s_RenderWidth || renderHeight != s_RenderHeight)
+  {
+    size_t screenBufferSize = (size_t)renderWidth * (size_t)renderHeight * sizeof(pixel_t);
+    pixel_t* resizedBuffer = realloc(DG_ScreenBuffer, screenBufferSize);
+
+    if (resizedBuffer != NULL)
+    {
+      DG_ScreenBuffer = resizedBuffer;
+      s_RenderWidth = renderWidth;
+      s_RenderHeight = renderHeight;
+      memset(DG_ScreenBuffer, 0, screenBufferSize);
+      s_TextureNeedsResize = 1;
+    }
+  }
+
+  if (canvasWidth != s_CanvasWidth || canvasHeight != s_CanvasHeight)
+  {
+    s_CanvasWidth = canvasWidth;
+    s_CanvasHeight = canvasHeight;
+
+    emscripten_set_canvas_element_size("#canvas", s_CanvasWidth, s_CanvasHeight);
+
+    if (window != NULL)
+    {
+      SDL_SetWindowSize(window, s_CanvasWidth, s_CanvasHeight);
+    }
+  }
+}
 
 static unsigned char convertToDoomKey(unsigned int key)
 {
@@ -560,28 +719,63 @@ void DG_Init()
 {
   emscripten_set_gamepadconnected_callback(NULL, false, onGamepadConnected);
   emscripten_set_gamepaddisconnected_callback(NULL, false, onGamepadDisconnected);
+  SDL_SetHint(SDL_HINT_RENDER_SCALE_QUALITY, "0");
+
+  DG_PollResize();
 
   window = SDL_CreateWindow("DOOM",
                             SDL_WINDOWPOS_UNDEFINED,
                             SDL_WINDOWPOS_UNDEFINED,
-                            DOOMGENERIC_RESX,
-                            DOOMGENERIC_RESY,
+                            s_CanvasWidth,
+                            s_CanvasHeight,
                             SDL_WINDOW_SHOWN
                             );
+  if (window == NULL)
+  {
+    fprintf(stderr, "Failed to create SDL window: %s\n", SDL_GetError());
+    return;
+  }
 
   // Setup renderer
   renderer =  SDL_CreateRenderer(window, -1, SDL_RENDERER_ACCELERATED);
+  if (renderer == NULL)
+  {
+    renderer = SDL_CreateRenderer(window, -1, 0);
+  }
+  if (renderer == NULL)
+  {
+    fprintf(stderr, "Failed to create SDL renderer: %s\n", SDL_GetError());
+    return;
+  }
+
+  SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
+  s_TextureNeedsResize = 1;
+  createOrResizeTexture();
+
   // Clear winow
   SDL_RenderClear( renderer );
   // Render the rect to the screen
   SDL_RenderPresent(renderer);
-
-  texture = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGB888, SDL_TEXTUREACCESS_TARGET, DOOMGENERIC_RESX, DOOMGENERIC_RESY);
 }
 
 void DG_DrawFrame()
 {
-  SDL_UpdateTexture(texture, NULL, DG_ScreenBuffer, DOOMGENERIC_RESX*sizeof(uint32_t));
+  if (renderer == NULL)
+  {
+    handleKeyInput();
+    updateGamepadInput();
+    return;
+  }
+
+  createOrResizeTexture();
+  if (texture == NULL)
+  {
+    handleKeyInput();
+    updateGamepadInput();
+    return;
+  }
+
+  SDL_UpdateTexture(texture, NULL, DG_ScreenBuffer, s_RenderWidth * sizeof(uint32_t));
 
   SDL_RenderClear(renderer);
   SDL_RenderCopy(renderer, texture, NULL, NULL);

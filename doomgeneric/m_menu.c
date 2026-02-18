@@ -58,6 +58,12 @@
 
 #include "m_menu.h"
 
+#ifdef __EMSCRIPTEN__
+void DG_MenuOverlayClear(void);
+int DG_MenuOverlayBeginCapture(void);
+void DG_MenuOverlayEndCapture(void);
+#endif
+
 
 extern patch_t*		hu_font[HU_FONTSIZE];
 extern boolean		message_dontfuckwithme;
@@ -1212,6 +1218,15 @@ void M_ChangeDetail(int choice)
 
 void M_SizeDisplay(int choice)
 {
+#ifdef __EMSCRIPTEN__
+    (void) choice;
+
+    screenblocks = 10;
+    screenSize = 7;
+    R_SetViewSize(screenblocks, detailLevel);
+    return;
+#endif
+
     switch(choice)
     {
       case 0:
@@ -1948,18 +1963,16 @@ static void M_DrawOPLDev(void)
 // Called after the view has been rendered,
 // but before it has been blitted.
 //
-void M_Drawer (void)
+static void M_DrawerPass(void)
 {
-    static short	x;
-    static short	y;
+    short		x;
+    short		y;
     unsigned int	i;
     unsigned int	max;
     char		string[80];
     char               *name;
     int			start;
 
-    inhelpscreens = false;
-    
     // Horiz. & Vertically center string and print it.
     if (messageToPrint)
     {
@@ -2034,6 +2047,26 @@ void M_Drawer (void)
 				      PU_CACHE));
 }
 
+void M_Drawer (void)
+{
+    inhelpscreens = false;
+
+#ifdef __EMSCRIPTEN__
+    DG_MenuOverlayClear();
+    if (messageToPrint || menuactive)
+    {
+        if (DG_MenuOverlayBeginCapture())
+        {
+            M_DrawerPass();
+            DG_MenuOverlayEndCapture();
+            return;
+        }
+    }
+#endif
+
+    M_DrawerPass();
+}
+
 
 //
 // M_ClearMenus
@@ -2081,7 +2114,12 @@ void M_Init (void)
     itemOn = currentMenu->lastOn;
     whichSkull = 0;
     skullAnimCounter = 10;
+#ifdef __EMSCRIPTEN__
+    screenblocks = 10;
+    screenSize = 7;
+#else
     screenSize = screenblocks - 3;
+#endif
     messageToPrint = 0;
     messageString = NULL;
     messageLastMenuActive = menuactive;
@@ -2122,4 +2160,3 @@ void M_Init (void)
 
     //opldev = M_CheckParm("-opldev") > 0;
 }
-

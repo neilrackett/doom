@@ -13,10 +13,12 @@ BUILDDIR=build
 
 SHELLFILE ?= $(SRCDIR)/emscripten-shell.html
 OUTPUT=$(BUILDDIR)/doom
+DOOM_PIXEL_RATIO ?= 2
 
 EMSDL_FLAGS = -sUSE_SDL=2 -sUSE_SDL_MIXER=2 -sSDL2_MIXER_FORMATS='["mid"]'
-CFLAGS = -DFEATURE_SOUND $(EMSDL_FLAGS)
+CFLAGS = -DFEATURE_SOUND -DDOOM_PIXEL_RATIO=$(DOOM_PIXEL_RATIO) $(EMSDL_FLAGS)
 LDFLAGS = $(EMSDL_FLAGS) \
+	-sALLOW_MEMORY_GROWTH=1 \
 	--shell-file $(SHELLFILE) \
 	--preload-file tmp/doom1.wad@doom1.wad \
 	# --preload-file timidity.cfg \
