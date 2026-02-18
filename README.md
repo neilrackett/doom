@@ -4,8 +4,6 @@ Ported by [Neil Rackett](https://x.com/neilrackett)
 
 ## Introduction
 
-<img width="638" height="397" alt="image" src="https://github.com/user-attachments/assets/1558c670-be05-427a-b1ce-1ee767a4870e" /> <img width="638" height="397" alt="image" src="https://github.com/user-attachments/assets/17067577-e151-4d6d-a9c6-69a1ef9d9837" />
-
 WebDOOM frees DOOM from it's 320x200 constraints in a responsive, full-browser port of the original version of DOOM based on [doomgeneric](https://github.com/ozkl/doomgeneric).
 
 Want to play DOOM in full-HD? Nothing to install. Just open the URL in a web browser on any device and it just works.

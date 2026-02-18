@@ -13,6 +13,7 @@ BUILDDIR=build
 
 SHELLFILE ?= $(SRCDIR)/emscripten-shell.html
 OUTPUT=$(BUILDDIR)/doom
+FAVICON=$(BUILDDIR)/favicon.ico
 DOOM_PIXEL_RATIO ?= 2
 
 EMSDL_FLAGS = -sUSE_SDL=2 -sUSE_SDL_MIXER=2 -sSDL2_MIXER_FORMATS='["mid"]'
@@ -38,11 +39,16 @@ clean:
 	rm -f $(OUTPUT).js
 	rm -f $(OUTPUT).data
 	rm -f $(OUTPUT).wasm
+	rm -f $(FAVICON)
 
-$(OUTPUT):	$(OBJS) | $(BUILDDIR)
+$(OUTPUT):	$(OBJS) $(FAVICON) | $(BUILDDIR)
 	@echo [Linking $@]
 	$(VB)$(CC) $(CFLAGS) $(LDFLAGS) $(OBJS) \
 	-o $(OUTPUT).html $(LIBS)
+
+$(FAVICON): $(SRCDIR)/favicon.ico | $(BUILDDIR)
+	@echo [Copying $<]
+	$(VB)cp $< $@
 
 $(OBJS): | $(OBJDIR)
 
