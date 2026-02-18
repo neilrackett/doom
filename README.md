@@ -1,10 +1,12 @@
-# WebDOOM: Responsive DOOM for the web
+# WebDOOM: Full-browser DOOM for the web
 
 Ported by [Neil Rackett](https://x.com/neilrackett)
 
 ## Introduction
 
-WebDOOM frees DOOM from it's 320x200 constraints in a responsive, full-browser port of the original version of DOOM based on [doomgeneric](https://github.com/ozkl/doomgeneric).
+<img width="960" height="540" alt="WebDOOM running in full HD" src="https://github.com/user-attachments/assets/91584a30-a882-47f0-8777-106f3cb31d5f" />
+
+WebDOOM frees DOOM from it's 320x200 constraints in a responsive, full-browser port of the original DOOM.
 
 Want to play DOOM in full-HD? Nothing to install. Just open the URL in a web browser on any device and it just works.
 
@@ -31,3 +33,7 @@ terms of the GNU General Public License. A copy of this license is included
 with the software in the file COPYING.
 
 This is a completely unofficial port and is not supported by 3D Realms, Apogee, or the porters.
+
+## Credits
+
+Big thank you to [doomgeneric](https://github.com/ozkl/doomgeneric)
