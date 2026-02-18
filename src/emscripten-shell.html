@@ -4,8 +4,8 @@
 <head>
   <meta charset="utf-8" />
   <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <meta name="description" content="WebDOOM is a web-based port of the classic DOOM game by id Software, running in your browser using Emscripten." />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+  <meta name="description" content="WebDOOM is a responsive web-based port of the classic DOOM game by id Software" />
   <meta name="keywords" content="DOOM, Doom, first-person shooter, id Software, classic game, action, weapons, levels" />
   <meta name="author" content="Neil Rackett" />
   <title>WebDOOM by Neil Rackett</title>
@@ -15,22 +15,15 @@
       margin: 0;
       width: 100%;
       height: 100%;
-      background: #0FF;
+      min-width: 320px;
+      min-height: 200px;
+      background: #000;
       overflow: hidden;
     }
 
     #viewport {
-      position: absolute;
-      top: 40px;
-      right: 40px;
-      bottom: 40px;
-      left: 40px;
-      min-width: 320px;
-      min-height: 200px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      overflow: hidden;
+      width: 100%;
+      height: 100%;
     }
 
     #canvas {
@@ -50,27 +43,28 @@
     <canvas id="canvas" width="1" height="1" tabindex="-1"></canvas>
   </div>
   <script>
+    const canvas = document.getElementById("canvas");
+
     var Module = {
       print: function (text) {
         if (arguments.length > 1) {
-          text = Array.prototype.slice.call(arguments).join(" ");
+          text = Array.from(arguments).slice(1).join(" ");
         }
         console.log(text);
       },
 
       printErr: function (text) {
         if (arguments.length > 1) {
-          text = Array.prototype.slice.call(arguments).join(" ");
+          text = Array.from(arguments).slice(1).join(" ");
         }
         console.error(text);
       },
 
       canvas: (function () {
-        var canvas = document.getElementById("canvas");
-        canvas.addEventListener("contextmenu", function (event) {
+        canvas.addEventListener("contextmenu", (event) => {
           event.preventDefault();
         });
-        canvas.addEventListener("webglcontextlost", function (event) {
+        canvas.addEventListener("webglcontextlost", (event) => {
           event.preventDefault();
           alert("WebGL context lost. Reload the page.");
         }, false);
@@ -79,6 +73,12 @@
 
       doomPixelRatio: 2,
     };
+
+    canvas.addEventListener("dblclick", (event) => {
+      document.fullscreenElement
+        ? document.exitFullscreen()
+        : canvas.requestFullscreen();
+    });
   </script>
   {{{ SCRIPT }}}
   <script>

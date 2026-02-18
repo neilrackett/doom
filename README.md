@@ -1,67 +1,35 @@
-# doomgeneric
-The purpose of doomgeneric is to make porting Doom easier.
-Of course Doom is already portable but with doomgeneric it is possible with just a few functions.
+# WebDOOM: Responsive DOOM for the web
 
-To try it you will need a WAD file (game data). If you don't own the game, shareware version is freely available (doom1.wad).
+Ported by [Neil Rackett](https://x.com/neilrackett)
 
-# porting
-Create a file named doomgeneric_yourplatform.c and just implement these functions to suit your platform.
-* DG_Init
-* DG_DrawFrame
-* DG_SleepMs
-* DG_GetTicksMs
-* DG_GetKey
+## Introduction
 
-|Functions            |Description|
-|---------------------|-----------|
-|DG_Init              |Initialize your platfrom (create window, framebuffer, etc...).
-|DG_DrawFrame         |Frame is ready in DG_ScreenBuffer. Copy it to your platform's screen.
-|DG_SleepMs           |Sleep in milliseconds.
-|DG_GetTicksMs        |The ticks passed since launch in milliseconds.
-|DG_GetKey            |Provide keyboard events.
-|DG_SetWindowTitle    |Not required. This is for setting the window title as Doom sets this from WAD file.
+<img width="638" height="397" alt="image" src="https://github.com/user-attachments/assets/1558c670-be05-427a-b1ce-1ee767a4870e" /> <img width="638" height="397" alt="image" src="https://github.com/user-attachments/assets/17067577-e151-4d6d-a9c6-69a1ef9d9837" />
 
-### main loop
-At start, call doomgeneric_Create().
+WebDOOM frees DOOM from it's 320x200 constraints in a responsive, full-browser port of the original version of DOOM based on [doomgeneric](https://github.com/ozkl/doomgeneric).
 
-In a loop, call doomgeneric_Tick().
+Want to play DOOM in full-HD? Nothing to install. Just open the URL in a web browser on any device and it just works.
 
-In simplest form:
-```
-int main(int argc, char **argv)
-{
-    doomgeneric_Create(argc, argv);
+[Click here to try it now!](https://labs.neilrackett.com/doom)
 
-    while (1)
-    {
-        doomgeneric_Tick();
-    }
-    
-    return 0;
-}
-```
+Supports keyboard and joystick/gamepad controls (optimised for Xbox controllers). Double-click for full screen.
 
-# sound
-Sound is much harder to implement! If you need sound, take a look at SDL port. It fully supports sound and music! Where to start? Define FEATURE_SOUND, assign DG_sound_module and DG_music_module.
+## Build
 
-# platforms
-Ported platforms include Windows, X11, SDL, emscripten. Just look at (doomgeneric_win.c, doomgeneric_xlib.c, doomgeneric_sdl.c).
-Makefiles provided for each platform.
+You can build WebDOOM using [Emscripten](https://emscripten.org/):
 
-## emscripten
-You can try it directly here:
-https://ozkl.github.io/doomgeneric/
+- Install the shareware version of DOOM (or [download if from Archive.org](https://archive.org/download/doom-wads))
+- Copy `DOOM1.WAD` into a `tmp` folder in the root of this project
+- Run `make`
 
-emscripten port is based on SDL port, so it supports sound and music! For music, timidity backend is used.
+All of the files you need to deploy WebROTT will be in the `build` folder, and you can play them locally by running `make serve` and opening http://localhost:8000 in your browser.
 
-## Windows
-![Windows](screenshots/windows.png)
+The build process uses Emscripten's internal version of SDL, so there's no need to install any dependencies.
 
-## X11 - Ubuntu
-![Ubuntu](screenshots/ubuntu.png)
+## License
 
-## X11 - FreeBSD
-![FreeBSD](screenshots/freebsd.png)
+This software is distributed in source code format and is licensed under the
+terms of the GNU General Public License. A copy of this license is included
+with the software in the file COPYING.
 
-## SDL
-![SDL](screenshots/sdl.png)
+This is a completely unofficial port and is not supported by 3D Realms, Apogee, or the porters.
