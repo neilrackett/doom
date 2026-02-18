@@ -7,7 +7,7 @@ endif
 
 CC = emcc
 
-SRCDIR=doomgeneric
+SRCDIR=src
 OBJDIR=obj
 BUILDDIR=build
 
