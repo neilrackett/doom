@@ -1,6 +1,6 @@
 # WebDOOM: Full-browser DOOM for the web
 
-Ported by [Neil Rackett](https://x.com/neilrackett)
+Ported by [Mesmotronic](https://x.com/mesmotronic)
 
 ## Introduction
 
@@ -10,7 +10,7 @@ WebDOOM frees DOOM from it's 320x200 constraints in a responsive, full-browser p
 
 Want to play DOOM in full-HD? Nothing to install. Just open the URL in a web browser on any device and it just works.
 
-[Click here to try it now!](https://labs.neilrackett.com/web-doom)
+[Click here to try it now!](https://labs.mesmotronic.com/web-doom)
 
 Supports keyboard and joystick/gamepad controls (optimised for Xbox controllers). Double-click for full screen.
 
